@@ -49,7 +49,6 @@ __mtgpics__ = 'Desktop' + os.sep + 'pics'
 __jsonsets__ = 'http://mtgjson.com/json/SetCodes.json'
 __jsonupdate__ = 'http://mtgjson.com/json/changelog.json'
 __one_set__ = 'http://mtgjson.com/json/{}.json'
-__pic_url__ =  'http://magiccards.info/scans/en/'
 __req_limit__ = 21          # can the server handle getting pounded by this many?
 __test_quant__ = 0          # set to zero for full run
 __max_errors__ = 0          # set positive to explore new import data
@@ -103,7 +102,7 @@ class DBMagic (object):
                 self.newDB = True
             else:
                 print("using existing table: {} ".format(t))
-            print("from file: {}".format(self.DBfn))
+            print("in file: {}".format(self.DBfn))
         self.tables = [a[0] for a in
                        self.cur.execute('''SELECT name FROM sqlite_master WHERE type='table' ''').fetchall()]
 
@@ -115,8 +114,8 @@ class DBMagic (object):
         Parameters
         ----------
         tableup: the table to which we are adding columns
-        column_map: {type() output as string: sqlite database-type, as string}
-                            {"<type 'list'>": 'BLOB', ...}
+        column_map: {'column_foo': sqlite database-type, as string}
+                          eg  {'column-name': 'INTEGER', ...}
         """
         present_columns = self.show_columns(tableup)
         for newcol, sql_dtype in column_map.viewitems():
@@ -171,6 +170,15 @@ class DBMagic (object):
         return n, error_count
 
 
+createstr = '''CREATE TABLE {} ({} TEXT PRIMARY KEY)'''
+set_db = DBMagic(DBfn=__sqlsets__,
+                 DBcolumns={__sets_t__: createstr.format(__sets_t__, __sets_key__)},
+                 DB_DEBUG=DEBUG)
+card_db = DBMagic(DBfn=__sqlcards__,
+                  DBcolumns={__cards_t__: createstr.format(__cards_t__, __cards_key__)},
+                  DB_DEBUG=DEBUG)
+
+
 def bootup():
     """
     Returns the bases and paths of required items needed to run this thing.
@@ -213,9 +221,10 @@ def asynch_getter(unsent, groupsize_limit=None, DBG=DEBUG):
 
 def column_parser(datas, exclusions=None, DEBUG=DEBUG):
     """
+    called by column_type_parser() now
     Parameters
     ----------
-    datas: a list of dicts
+    datas: a list of dicts, possibly derived from downloaded json card data
     exclusions: the keys from datas we don't want in the database
 
     Returns
@@ -238,10 +247,10 @@ def column_parser(datas, exclusions=None, DEBUG=DEBUG):
 
 def column_type_parser(datas, exclusions=None, types_map=None, DEBUG=DEBUG):
     """
-    consequently serves to supply columns that need to be added
+     supply columns & types that need to be added to db from import data
     Parameters
     ----------
-    types_map: {'python type() output as string': 'sqlite-data-type', ...}
+    types_map: user created {'python type() output as string': 'sqlite-data-type', ...}
 
     Returns
     -------
@@ -367,8 +376,16 @@ def xando(setcodes, mk='-x'):
     return keepers
 
 
-def imagine(picpath):
-    """http://magiccards.info/scans/en/ai/42.jpg"""
+def deckify(dats):
+    """ add a column 'code' to make set queries a bit easier
+        # put all cards from all sets into one flat list"""
+    deck = []
+    for e in dats:
+        for cardline in e[__cards_dk__]:
+            cardline.setdefault(u'code', e[__sets_key__])
+            deck.append(cardline)
+    return deck
+
 
 def main():
     homedir, picdir, sqldbs, picsets = bootup()
@@ -376,27 +393,17 @@ def main():
     if (DEBUG and (len(sqldbs) == len(__sqlfiles__))):
         print("using existing sqlite db fns: {}".format(sqldbs))
 
-    createstr = '''CREATE TABLE {} ({} TEXT PRIMARY KEY)'''
-    set_db = DBMagic(DBfn=__sqlsets__,
-                     DBcolumns={__sets_t__: createstr.format(__sets_t__, __sets_key__)},
-                     DB_DEBUG=DEBUG)
-    card_db = DBMagic(DBfn=__sqlcards__,
-                      DBcolumns={__cards_t__: createstr.format(__cards_t__, __cards_key__)},
-                      DB_DEBUG=DEBUG)
-
     urls = [__one_set__.format(s) for s in xando(starting_sets(sqldbs))]
     unsent = [grequests.get(u) for u in urls[:(__test_quant__ or len(urls))]]
 
-    datas, fails = info_grubber(unsent, tries=12)
+    datas, fails = info_grubber(unsent, tries=8)
 
     for p in fails:
         print("url didn't play nice: {}".format(p))
 
-    # put all cards from all sets into one flat list
-    deck = [cardline for e in datas for cardline in e[__cards_dk__]]
-
     # aggregate all the columns (while assigning their data-types) for each data-set
     columns_for_sets = column_type_parser(datas, exclusions=__set_hdr_excluded__)
+    deck = deckify(datas)
     columns_for_cards = column_type_parser(deck, exclusions=__cards_hdr_excluded__)
 
     if DEBUG:
