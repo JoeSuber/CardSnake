@@ -22,6 +22,7 @@ import requests, grequests
 from collections import deque, defaultdict, Counter
 import Levenshtein as leven
 from operator import itemgetter
+from itertools import izip
 
 import os
 import cv2
@@ -30,7 +31,8 @@ import numpy as np
 __db_pic_col__ = {'pic_path': 'TEXT'}
 __db_link__ = {'pic_link': 'TEXT'}
 __db_card_count__ = {'card_count': 'INTEGER'}
-__mci_jpg__ = 'http://magiccards.info/scans/en/{}/{}.jpg'
+__mci_front__ = 'http://magiccards.info/scans/en/'
+__mci_jpg__ = __mci_front__ + '{}/{}.jpg'
 __mci_set_stub__ = "http://magiccards.info/{}/en.html"
 __mci_parser__ = '<td><a href="/{}/en/'
 
@@ -82,6 +84,7 @@ def card_counts(counter_col):
 
 
 def num_from_urls(urls, num):
+    # num is actually text
     # must split it out to avoid finding '1' in '100'
     for u in urls:
         #print "urls u:", u
@@ -164,39 +167,106 @@ def populate_links(setcodes):
     peep.card_db.con.commit()
 
 
+def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100):
+    """
+    to avoid blasting the web-server with grequests, check for valid local pictures a few at a time.
+    Get the missing pics using the pic_link.  Update the database.
+    """
+    sql = '''SELECT id, name, pic_path, pic_link, code from {}'''.format(peep.__cards_t__)
+    usql = '''UPDATE {} SET pic_path=? WHERE id=?'''.format(peep.__cards_t__)
+    codemap = setcodeinfo()
+    work = db.cur.execute(sql).fetchall()
+    real_work = []
+    needs_link = defaultdict(list)
+    needed_ids, needed_local_paths, needed_links = [], [], []
+    already_here = defaultdict(list)
+    new_dirs = Counter()
+
+    # first filter out some causes of errors
+    for w in work:
+        # is there a link?
+        if not w['pic_link']:
+            #print ("NO PIC LINK: {} of {}".format(w['name'], w['code']))
+            needs_link[w['code']].append(w['id'])
+            continue
+        # is the required file present and not empty?
+        if w['pic_path']:
+            prospect = os.path.join(fs_stub, w['pic_path'])
+            if os.path.isfile(prospect) and os.stat(prospect).st_size > 10:
+                already_here[w['code']].append(prospect)
+                continue
+        # if none of above, add to real_work
+        real_work.append(w)
+
+    quant_left = len(real_work)
+    # go to work on work
+    for w in real_work[:min(attempt, quant_left)]:
+        needed_local_paths.append(os.path.join(fs_stub, w['code'], w['pic_link'].split('/')[-1]))
+        needed_ids.append(w['id'])
+        needed_links.append(w['pic_link'])
+        new_dirs[os.path.join(fs_stub, w['code'])] += 1
+
+    # make new directories
+    for dir in new_dirs.keys():
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
+
+    # prepare & send work to grequests
+    reqs = (grequests.get(u) for u in needed_links)
+    resps = grequests.map(reqs)
+
+    successes = 0
+
+    # take responses and turn into files, record success in database
+    for num, (lp, dbid, rsp) in enumerate(izip(needed_local_paths, needed_ids, resps)):
+        if rsp.status_code == 200:
+            try:
+                with open(lp, 'wb') as fob:
+                    for chunk in rsp.iter_content(1024):
+                        fob.write(chunk)
+                a, b = lp.split('/')[-2:]
+                db.cur.execute(usql, (os.path.join(a, b), dbid))
+                successes += 1
+            except Exception as e:
+                print(e)
+                print("{} had good response, but is still screwy!".format(lp))
+
+        if rsp.status_code != 200:
+            print("{}: {} - {} -> Not Recorded".format(num, lp, rsp.status_code))
+
+    db.con.commit()
+    print("{} more pics needed".format(quant_left-successes))
+    return quant_left - successes
+
+
 def main():
     peep.card_db.add_columns(peep.__cards_t__, __db_pic_col__)
     peep.card_db.add_columns(peep.__cards_t__, __db_link__)
     peep.set_db.add_columns(peep.__sets_t__, __db_card_count__)
-
-    l = ['id', 'originalType', 'code', 'reserved', 'toughness', 'text', 'supertypes', 'number', 'releaseDate',
-         'colors', 'names', 'subtypes', 'flavor', 'border', 'timeshifted', 'colorIdentity', 'layout', 'multiverseid',
-         'source', 'imageName', 'types', 'manaCost', 'type', 'legalities', 'life', 'power', 'watermark', 'printings',
-         'loyalty', 'hand', 'starter', 'mciNumber', 'originalText', 'name', 'artist', 'variations', 'rulings', 'rarity',
-         'cmc', 'pic_path', 'pic_link']
-
-    print peep.card_db.show_columns(peep.__cards_t__)
-
+    #print peep.card_db.show_columns(peep.__cards_t__)
     it = peep.card_db.cur.execute("SELECT * FROM cards").fetchall()
-    c = 0
+    c, d = 0, 0
     for t in it:
         if t['pic_link']:
             c += 1
-    print("before updates of {} entries, counted pic links = {}".format(len(it), c))
+        if t['pic_path']:
+            d += 1
+    print("before updates of {} entries, counted pic links = {} and local pic paths = {}".format(len(it), c, d))
 
-    # for testing
+    # for testing populate_links
     #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
     #peep.card_db.con.commit()
     # # # # # # #
 
     populate_links(card_counts(__db_card_count__.keys()[0]))
-
-        #for k, v in setcodeinfo().viewitems():
-
-        #unsent = [grequests.get(need) for need in checkimages(k, v)]
-
-    it = peep.card_db.cur.execute("SELECT * FROM cards").fetchall()
-
+    trying = 200
+    quant = 0
+    print("attempting to get {} per download run:".format(trying))
+    while download_pics(attempt=trying) > 0:
+        quant += 1
+        if (trying * quant) > c+1000:
+            print("Too many tries. resting...")
+            break
 
     return 1
 
