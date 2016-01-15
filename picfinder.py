@@ -88,7 +88,7 @@ def num_from_urls(urls, num):
     # must split it out to avoid finding '1' in '100'
     for u in urls:
         #print "urls u:", u
-        if num == u.split('/')[6].split('.jpg')[0]:
+        if num == u.split('/')[-1].split('.jpg')[0]:
             return u
     return False
 
@@ -109,6 +109,7 @@ def populate_links(setcodes):
                 links.update(setlist_links(box_set_code))
             print(u"{} aka {}: has {} web-based, but {} local items".format(s, mci, len(links), starting_work))
 
+        # try to match by card number in url
         for x in xrange(len(work)):
             w = work.pop()
             num, result = w['number'], False
@@ -125,6 +126,7 @@ def populate_links(setcodes):
 
         intermediate_work = len(work)
 
+        # try matching to href links by exact names in database
         revlinks = defaultdict(list)
         for k, v in links.viewitems():
             revlinks[v.encode('utf-8')].append(k)
@@ -264,7 +266,7 @@ def main():
     print("attempting to get {} per download run:".format(trying))
     while download_pics(attempt=trying) > 0:
         quant += 1
-        if (trying * quant) > c+1000:
+        if (trying * quant) > c+500:
             print("Too many tries. resting...")
             break
 

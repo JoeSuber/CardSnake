@@ -6,7 +6,7 @@ data-types as well as strings and ints.
 
 The updates only update what has changed after the initial run, so should be pretty low overhead
 
-USE: http://mtgjson.com/json/changelog.json to update card db entries that have changed using the SET updater
+uses: http://mtgjson.com/json/changelog.json to update card db entries that have changed using the SET updater
 """
 
 import os
@@ -161,9 +161,8 @@ card_db = DBMagic(DBfn=__sqlcards__,
 def bootup():
     """
     Returns the bases and paths of required items needed to run this thing.
-    magiccards.info uses some different set codes for their images, and those
-    are what get used for the local pics directory structure. Luckily the json data has
-    those alternate dirnames in there somewhere.
+    magiccards.info uses some different set codes for their images, needed for downloads.
+    Luckily the json data has those alternate dirnames in there somewhere.
     -------
     """
     homedir = os.getcwd()
