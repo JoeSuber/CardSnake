@@ -1,33 +1,12 @@
 
 """
-pic-getter:  using db, construct list of urls to check for pics on magic-cards.info
+populate.py is run to initially create and then keep updated a local sqlite database from the .json files
+maintained at mtgjson.com. It can do this for any .json files, I think, parsing list and dict
+data-types as well as strings and ints.
 
-check that local filenames of images map to card data; map the new ones.
-Note pic filenames without db entries in a text file or db for later display and debugging, but DO NOT
-OVERWRITE AN OLD pic-path with a new one without user intervention... too much weird stuff
-Note card db entries without a picture - find pic on magiccards.info or somewhere.. ABU, wizards.
-    remove the db-entry for pics we can't find? or just note a date-time (so that it tries to get the pic again later)
+The updates only update what has changed after the initial run, so should be pretty low overhead
 
 USE: http://mtgjson.com/json/changelog.json to update card db entries that have changed using the SET updater
-
-create DCT as int64 for each new card using square that has art.
-create Descriptor/keypoints for the cards needing it, perhaps without using pickle. (try KAZE) (test?)
-create Set-symbol pic-patch - store in db?
-
-if new stuff is present, do directed learning to create set-symbol vocabulary. record the output file.
-try to load the output file into its detector object.
-
-perhaps implement as side-project: directed learning for "orientation" - 3 values -
-2 fronts, with pic on left and right, and card back.  Perhaps affine-transform training images slightly.
-Perhaps use hamm-dist from a Set-wide-hamm-dist-mean or some other mean singular value.
-    idea: find out what the closest (dct-hamming dist) "wrong" art-block is to a "correct" sample block...
-        could crawl through the result by then taking the wrong part of the closest and recurse n-times to see if the
-        any hamm-dist values are ever lower or trend higher than singular randomly chosen samples.
-
-    idea: find out the deviation between stock image DCT and cam-captured DCT for a wide range of samples
-
-    idea: make a Class to display cards with their names & images efficiently without accidentally creating arrays
-    that are too big
 """
 
 import os
