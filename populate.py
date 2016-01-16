@@ -17,6 +17,8 @@ import requests
 import grequests
 from collections import Counter
 import time
+import gmpy2
+from gmpy2 import mpz
 
 DEBUG = True
 __author__ = 'suber1'
@@ -25,6 +27,7 @@ __sqlsets__ = os.getcwd() + os.sep + 'mtg_sets' + __sqlext__
 __sqlcards__ = os.getcwd() + os.sep + 'mtg_cards' + __sqlext__
 __sqlfiles__ = [__sqlsets__, __sqlcards__]
 __mtgpics__ = os.getcwd() + os.sep + 'pics'
+__needs__ = os.getcwd() + os.sep + 'needs_pic_links.json'
 __jsonsets__ = 'http://mtgjson.com/json/SetCodes.json'
 __jsonupdate__ = 'http://mtgjson.com/json/changelog.json'
 __one_set__ = 'http://mtgjson.com/json/{}.json'
@@ -46,7 +49,9 @@ __types__ = {"<type 'list'>": 'json',
              "<type 'float'>": 'REAL',
              "<type 'int'>": 'INTEGER',
              "<type 'dict'>": 'json',
-             "<type 'bool'>": 'TEXT'}
+             "<type 'bool'>": 'TEXT',
+             "<type 'mpz'>": 'mpz'}
+
 
 
 class DBMagic (object):
@@ -65,8 +70,10 @@ class DBMagic (object):
         if not os.path.isdir(os.path.dirname(self.DBfn)):
             os.makedirs(os.path.dirname(self.DBfn))
         sqlite3.register_converter("json", json.loads)
+        sqlite3.register_converter("mpz", gmpy2.mpz)
         sqlite3.register_adapter(list, json.dumps)
         sqlite3.register_adapter(dict, json.dumps)
+        sqlite3.register_adapter(mpz, gmpy2.digits)
         self.con = sqlite3.connect(self.DBfn, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
         self.con.row_factory = sqlite3.Row
         self.con.text_factory = sqlite3.OptimizedUnicode
@@ -259,7 +266,7 @@ def check_for_updates(update_url, oldfn, need_all=False, DBG=DEBUG):
     Parameters
     ----------
     update_url = url for json-encoded changes to the mtgjson.com data
-    oldfn = local file-name for txt-file showing the most recent changes incorporated locally
+    oldfn = local file-name for .json file showing the most recent changes incorporated locally
 
     Returns
     -------

@@ -15,6 +15,7 @@ load from db and check that pics paths are present and valid
 get the missing pics of cards downloaded to a local directory structure.
 record the paths in the database.
 """
+
 import sys
 reload(sys).setdefaultencoding("utf8")
 import populate as peep
@@ -23,10 +24,9 @@ from collections import deque, defaultdict, Counter
 import Levenshtein as leven
 from operator import itemgetter
 from itertools import izip
-
 import os
-import cv2
-import numpy as np
+import json
+
 
 __db_pic_col__ = {'pic_path': 'TEXT'}
 __db_link__ = {'pic_link': 'TEXT'}
@@ -126,7 +126,7 @@ def populate_links(setcodes):
 
         intermediate_work = len(work)
 
-        # try matching to href links by exact names in database
+        # try matching to href links by exact card-names in database
         revlinks = defaultdict(list)
         for k, v in links.viewitems():
             revlinks[v.encode('utf-8')].append(k)
@@ -139,15 +139,18 @@ def populate_links(setcodes):
                     #print(u"no exact match from {} column for {} ".format(name_col, w[name_col]))
                     work.appendleft(w)
 
-        # what remains of work doesn't match anything exactly.
-        # now use Levenshtein distance against names.
         print(u"started: {}   by numbers down to: {}   by exact names: {}   "
               u"for set='{}' aka http://magiccards.info/{}/en.html"
               .format(starting_work, intermediate_work, len(work), s, mci))
 
-        for k, l in revlinks.items():
+        # clear out empty entries
+        for k, l in revlinks.viewitems():
             if not l:
                 revlinks.pop(k)
+
+        # what remains of work doesn't match anything exactly.
+        # now use Levenshtein distance against names.
+
         for w in work:
             scored = []
             for name, link in revlinks.viewitems():
@@ -155,25 +158,27 @@ def populate_links(setcodes):
                     scored.append((name, leven.distance(w['name'].encode('utf-8'),
                                                         name.encode('utf-8'))))
                 except UnicodeDecodeError as e:
-                    print(u"{} :  -{}-  vs -{}-".format(e, w['name'].encode('utf-8'),
-                                                        name.encode('utf-8')))
+                    print(u"{} :  -{}-  vs -{}-".format(e, w['name'].encode('utf-8', errors='replace'),
+                                                        name.encode('utf-8', errors='replace')))
             if not scored:
                 continue
             winner, points = sorted(scored, key=itemgetter(1))[0]
-            if points < 5:
+            if points < 6:
                 winning_link = revlinks[winner].pop()
                 if winning_link:
-                    print(u"{}  - close match: (mtginfo)'{}'  ==  '{}'(local) SCORE: {}"
+                    print(u"{}  - close enough match: (mtginfo)'{}'  ==  '{}'(local) SCORE: {}"
                           .format(winning_link, winner, w['name'], points))
                     peep.card_db.cur.execute(usql, (winning_link, w['id']))
     peep.card_db.con.commit()
 
 
-def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100):
+def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=None):
     """
     to avoid blasting the web-server with grequests, check for valid local pictures a few at a time.
     Get the missing pics using the pic_link.  Update the database.
     """
+    if skip is None:
+        skip = []
     sql = '''SELECT id, name, pic_path, pic_link, code from {}'''.format(peep.__cards_t__)
     usql = '''UPDATE {} SET pic_path=? WHERE id=?'''.format(peep.__cards_t__)
     codemap = setcodeinfo()
@@ -186,6 +191,9 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100):
 
     # first filter out some causes of errors
     for w in work:
+        # are we supposed to skip it?
+        if w['id'] in skip:
+            continue
         # is there a link?
         if not w['pic_link']:
             #print ("NO PIC LINK: {} of {}".format(w['name'], w['code']))
@@ -199,6 +207,10 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100):
                 continue
         # if none of above, add to real_work
         real_work.append(w)
+
+    #fix the missing links at a later date, perhaps
+    with open(peep.__needs__, 'wb') as fob:
+        json.dump(needs_link, fob)
 
     quant_left = len(real_work)
     # go to work on work
@@ -232,13 +244,12 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100):
             except Exception as e:
                 print(e)
                 print("{} had good response, but is still screwy!".format(lp))
-
-        if rsp.status_code != 200:
-            print("{}: {} - {} -> Not Recorded".format(num, lp, rsp.status_code))
+        if rsp.status_code == 404:
+            skip.append(dbid)
 
     db.con.commit()
     print("{} more pics needed".format(quant_left-successes))
-    return quant_left - successes
+    return skip, quant_left - successes
 
 
 def main():
@@ -247,13 +258,6 @@ def main():
     peep.set_db.add_columns(peep.__sets_t__, __db_card_count__)
     #print peep.card_db.show_columns(peep.__cards_t__)
     it = peep.card_db.cur.execute("SELECT * FROM cards").fetchall()
-    c, d = 0, 0
-    for t in it:
-        if t['pic_link']:
-            c += 1
-        if t['pic_path']:
-            d += 1
-    print("before updates of {} entries, counted pic links = {} and local pic paths = {}".format(len(it), c, d))
 
     # for testing populate_links
     #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
@@ -262,13 +266,18 @@ def main():
 
     populate_links(card_counts(__db_card_count__.keys()[0]))
     trying = 200
-    quant = 0
+    remains = len(it)
+    baddies = []
     print("attempting to get {} per download run:".format(trying))
-    while download_pics(attempt=trying) > 0:
-        quant += 1
-        if (trying * quant) > c+500:
-            print("Too many tries. resting...")
-            break
+    while remains > 0:
+        bad, remains = download_pics(attempt=trying, skip=baddies)
+        if bad:
+            baddies.append(bad)
+
+    for bad in baddies:
+        for i in it:
+            if i['id'] == bad:
+                print("404, bad link: {} - {}".format(i['name'], i['pic_link']))
 
     return 1
 
