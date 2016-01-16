@@ -176,7 +176,9 @@ def bootup():
     -------
     """
     homedir = os.getcwd()
-    picdir = os.path.join(os.path.expanduser('~'), __mtgpics__)
+    if not os.path.isdir(__mtgpics__):
+        os.mkdir(__mtgpics__)
+    picdir = __mtgpics__
     return homedir, picdir, \
            [unicode(q.basename()) for q in path.path(homedir).files('*' + __sqlext__)], \
            [unicode(p.basename()) for p in path.path(picdir).dirs()]
