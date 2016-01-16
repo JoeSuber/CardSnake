@@ -50,7 +50,7 @@ def linkup(line):
     # out: ('Angel of Flight Alabaster', http://magiccards.info/scans/en/isd/2.jpg')
     a, b = line.split('.html">')
     ms, num = a.split('    <td><a href="/')[1].split('/en/')
-    name = b.split('</a>')[0]
+    name = b.split('</a>')[0].strip()
     return __mci_jpg__.format(ms, num), name
 
 
@@ -64,16 +64,44 @@ def setlist_links(mci_setcode):
 
 
 def card_counts(counter_col):
-    current_counts, old_counts, needs_links = {}, {}, {}
-    old_counts = dict(peep.set_db.cur.execute("select {},{} from {}"
-                                              .format(u'code', counter_col, peep.__sets_t__)).fetchall())
+    """
+    returns a dict of codes that need to be looked at. A hacked up thing to be sure.
+    looks at (and generates) a text file the user can edit to add magiccards.info codes
+    missing from the mtgjson import data. Also makes us look at all set codes missing local
+    images or that have a new number of items since last checked.
+    """
+    current_counts, needs_links, tackon = {}, {}, {}
+    try:
+        with open(peep.__tackon__, 'rU') as fob:
+            lines = fob.readlines()
+    except IOError:
+        lines = []
+    for l in lines:
+        chunks = l.strip().split(': ')
+        if len(chunks) > 2:
+            tackon[chunks[1].strip()] = chunks[2].strip()
+    print ("tackon dict: {}".format(tackon))
+
+    old_counts = dict(peep.set_db.cur.execute("select {},{} from {}".format(u'code', counter_col,
+                                                                            peep.__sets_t__)).fetchall())
+    # blank the file so it doesn't just repeat forever
+    with open(peep.__tackon__, 'wb') as fob:
+        fob.write("\n")
 
     for kkk, mci in setcodeinfo().viewitems():
-        hits = peep.card_db.cur.execute("select code from {} WHERE code=?"
-                                        .format(peep.__cards_t__), (kkk,)).fetchall()
+        if (mci is None) and (kkk in tackon.keys()):
+            mci = tackon[kkk]
+            peep.set_db.cur.execute("UPDATE set_infos SET magicCardsInfoCode=? WHERE code=?", (mci, kkk))
+        allhits = peep.card_db.cur.execute("select code, pic_path from {} WHERE code=?"
+                                           .format(peep.__cards_t__), (kkk,)).fetchall()
+        setname = peep.set_db.cur.execute("select name from set_infos where code=?", (kkk,)).fetchone()
+        if mci is None:
+            print("{} aka {}: has no magicCardsInfoCode. Edit {} to fix".format(setname['name'], kkk, peep.__tackon__))
+            with open(peep.__tackon__, 'a+') as fob:
+                fob.write("{}: {}: {}".format(setname['name'], kkk, '\n'))
+        hits = [code for code, path in allhits if path]
         current_counts[kkk] = len(hits)
-        if current_counts[kkk] != old_counts[kkk]:
-            print("ATTN: cards in set {} changed from {} to {}".format(kkk, old_counts[kkk], current_counts[kkk]))
+        if (len(hits) != len(allhits)) or (old_counts[kkk] != current_counts[kkk]):
             peep.set_db.cur.execute("UPDATE {} SET {}=({}) WHERE {}='{}'".format(peep.__sets_t__,
                                                                              counter_col,
                                                                              current_counts[kkk],
@@ -96,6 +124,8 @@ def num_from_urls(urls, num):
 def populate_links(setcodes):
     sql = '''SELECT id, name, imageName, number from {} where code=?'''.format(peep.__cards_t__)
     usql = '''UPDATE {} SET pic_link=? WHERE id=?'''.format(peep.__cards_t__)
+    with open("local_mias", 'wb') as fob:
+        fob.write("list of unmatched local database items:\n")
     for s, mci in setcodes.viewitems():
         if mci is None:
             print("ATTENTION: {} has no magiccards.info code, and will get no pics from there!".format(s))
@@ -103,12 +133,12 @@ def populate_links(setcodes):
         work = deque(peep.card_db.cur.execute(sql, (s,)).fetchall())
         starting_work = len(work)
         links = setlist_links(mci)
-        if len(links) != starting_work:
-            if len(links) < starting_work:
-                box_set_code = mci[:2] + 'b'
-                links.update(setlist_links(box_set_code))
-            print(u"{} aka {}: has {} web-based, but {} local items".format(s, mci, len(links), starting_work))
-
+        if len(links) < starting_work:
+            box_set_code = mci[:2] + 'b'
+            links.update(setlist_links(box_set_code))
+            msg = u"{} aka {}: has {} web-based, but {} local items\n".format(s, mci, len(links), starting_work)
+            with open("local_mias", 'a+') as fob:
+                fob.write(msg)
         # try to match by card number in url
         for x in xrange(len(work)):
             w = work.pop()
@@ -130,7 +160,7 @@ def populate_links(setcodes):
         revlinks = defaultdict(list)
         for k, v in links.viewitems():
             revlinks[v.encode('utf-8')].append(k)
-        for name_col in ['name', 'imageName']:
+        for name_col in ['name']:
             for x in xrange(len(work)):
                 w = work.pop()
                 try:
@@ -139,12 +169,14 @@ def populate_links(setcodes):
                     #print(u"no exact match from {} column for {} ".format(name_col, w[name_col]))
                     work.appendleft(w)
 
-        print(u"started: {}   by numbers down to: {}   by exact names: {}   "
-              u"for set='{}' aka http://magiccards.info/{}/en.html"
-              .format(starting_work, intermediate_work, len(work), s, mci))
+        msg = u"started: {}   by numbers down to: {}   by exact names: {}  " \
+              u"for set='{}' aka http://magiccards.info/{}/en.html \n"\
+            .format(starting_work, intermediate_work, len(work), s, mci)
+        with open("local_mias", 'a+') as fob:
+            fob.write(msg)
 
         # clear out empty entries
-        for k, l in revlinks.viewitems():
+        for k, l in revlinks.items():
             if not l:
                 revlinks.pop(k)
 
@@ -152,6 +184,10 @@ def populate_links(setcodes):
         # now use Levenshtein distance against names.
 
         for w in work:
+            synthlink = __mci_jpg__.format(mci, w['number'])
+            msg = u"{}   -{}-\n".format(synthlink, w['name'])
+            with open("local_mias", 'a+') as fob:
+                fob.write(msg)
             scored = []
             for name, link in revlinks.viewitems():
                 try:
@@ -163,12 +199,15 @@ def populate_links(setcodes):
             if not scored:
                 continue
             winner, points = sorted(scored, key=itemgetter(1))[0]
-            if points < 6:
-                winning_link = revlinks[winner].pop()
-                if winning_link:
+            if points < 5:
+                if revlinks[winner]:
+                    winning_link = revlinks[winner].pop()
                     print(u"{}  - close enough match: (mtginfo)'{}'  ==  '{}'(local) SCORE: {}"
                           .format(winning_link, winner, w['name'], points))
                     peep.card_db.cur.execute(usql, (winning_link, w['id']))
+
+        #todo: use magiccards.info 'extras' page to do more final matching
+
     peep.card_db.con.commit()
 
 
@@ -208,7 +247,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
         # if none of above, add to real_work
         real_work.append(w)
 
-    #fix the missing links at a later date, perhaps
+    #fix the missing links at a later date, perhaps. Recording ids
     with open(peep.__needs__, 'wb') as fob:
         json.dump(needs_link, fob)
 
@@ -260,8 +299,8 @@ def main():
     it = peep.card_db.cur.execute("SELECT * FROM cards").fetchall()
 
     # for testing populate_links
-    #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
-    #peep.card_db.con.commit()
+    peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
+    peep.card_db.con.commit()
     # # # # # # #
 
     populate_links(card_counts(__db_card_count__.keys()[0]))

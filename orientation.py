@@ -23,7 +23,8 @@ orient_db.add_columns('orient', {'top_dct': 'mpz', 'bot_dct': 'mpz', 'picpath': 
 
 
 def dct_hint(im, hsize=32):
-    """ because we take the measure against the mean, no need to convert float32 properly """
+    """ because we take the measure against the mean, no need to convert float32.
+    returning DCT hash as 64-bit mpz int, which makes popcount exceedingly fast"""
     q = 0
     bumpy = cv2.dct(np.array(cv2.resize(im, dsize=(hsize, hsize),
                                         interpolation=cv2.INTER_AREA), dtype=np.float32))[:8, 1:9]
@@ -43,6 +44,7 @@ def cards(fs=peep.__mtgpics__):
 
 
 def add_dct_data(cardpaths):
+    print("starting dct of all {} items".format(len(cardpaths)))
     datas = []
     for k, v in cardpaths.viewitems():
         im = cv2.equalizeHist(cv2.imread(v, cv2.IMREAD_GRAYSCALE))
@@ -50,10 +52,14 @@ def add_dct_data(cardpaths):
         line = {'id': k, 'pic_path': v, 'top_dct': dct_hint(im[:width, :width]),
                 'bot_dct': dct_hint(im[height-width:height, :width])}
         datas.append(line)
-    orient_db.add_data(cardpaths, 'orient', datas)
-
+    print("obtained data, now committing to db")
+    orient_db.add_data(datas, 'orient', 'id')
+    orient_db.con.commit()
+    
+    return datas
 
 def show(cardpaths):
+    print("press <esc> to exit the viewer ")
     for k, v in cardpaths.viewitems():
         im = cv2.equalizeHist(cv2.imread(v, cv2.IMREAD_GRAYSCALE))
         height, width = im.shape[:2]
@@ -69,6 +75,8 @@ def show(cardpaths):
 def main():
     ch = show(cards())
     print ch
+
+    add_dct_data(cards())
 
 if __name__ == "__main__":
     exit(main())
