@@ -254,10 +254,13 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     quant_left = len(real_work)
     # go to work on work
     for w in real_work[:min(attempt, quant_left)]:
-        needed_local_paths.append(os.path.join(fs_stub, w['code'], w['pic_link'].split('/')[-1]))
+        tag = ''
+        if (w['code'] == 'CON') and 'windows' in os.environ['OS'].lower():
+            tag = 'win'
+        needed_local_paths.append(os.path.join(fs_stub, w['code']+tag, w['pic_link'].split('/')[-1]))
         needed_ids.append(w['id'])
         needed_links.append(w['pic_link'])
-        new_dirs[os.path.join(fs_stub, w['code'])] += 1
+        new_dirs[os.path.join(fs_stub, w['code']+tag)] += 1
 
     # make new directories
     for dir in new_dirs.keys():
@@ -277,7 +280,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
                 with open(lp, 'wb') as fob:
                     for chunk in rsp.iter_content(1024):
                         fob.write(chunk)
-                a, b = lp.split('/')[-2:]
+                a, b = lp.split(os.path.sep)[-2:]
                 db.cur.execute(usql, (os.path.join(a, b), dbid))
                 successes += 1
             except Exception as e:
