@@ -281,19 +281,23 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
         if (w['code'] == 'CON') and 'windows' in os.environ['OS'].lower():
             tag = 'win'
         # preserve unique origination information in the filename:
-        needed_local_paths.append(os.path.join(fs_stub, w['code'] + tag, "-".join(w['pic_link'].split("/")[:-2])))
+        q = w['pic_link'].split("/")
+        needed_local_paths.append(os.path.join(fs_stub, w['code'] + tag, "".join(q[-2:])))
         needed_ids.append(w['id'])
         needed_links.append(w['pic_link'])
         new_dirs[os.path.join(fs_stub, w['code'] + tag)] += 1
 
     # check that all filenames are unique
-    for p, l in zip(needed_local_paths, needed_links):
-        idxs = [i for i, s in enumerate(needed_local_paths) if p == s]
-        if idxs > 1:
-            print("         *********")
-            for x in idxs:
-                print needed_local_paths[x], " - ", needed_links[x]
-    assert(len(set(needed_local_paths)) == len(needed_local_paths))
+    try:
+        assert(len(set(needed_local_paths)) == len(needed_local_paths))
+    except AssertionError:
+        for p, l in zip(needed_local_paths, needed_links):
+            idxs = [i for i, s in enumerate(needed_local_paths) if p == s]
+            if idxs > 1:
+                print("         *********")
+                for x in idxs:
+                    print needed_local_paths[x], " - ", needed_links[x]
+        exit(1)
 
     # make new directories
     for dir in new_dirs.keys():
@@ -313,7 +317,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
                 with open(lp, 'wb') as fob:
                     for chunk in rsp.iter_content(1024):
                         fob.write(chunk)
-                a, b = lp.split(os.path.sep)[:-2]
+                a, b = lp.split(os.path.sep)[-2:]
                 db.cur.execute(usql, (os.path.join(a, b), dbid))
                 successes += 1
             except Exception as e:
