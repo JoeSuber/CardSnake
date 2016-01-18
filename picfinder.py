@@ -287,6 +287,12 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
         new_dirs[os.path.join(fs_stub, w['code'] + tag)] += 1
 
     # check that all filenames are unique
+    for p, l in zip(needed_local_paths, needed_links):
+        idxs = [i for i, s in enumerate(needed_local_paths) if p == s]
+        if idxs > 1:
+            print("         *********")
+            for x in idxs:
+                print needed_local_paths[x], " - ", needed_links[x]
     assert(len(set(needed_local_paths)) == len(needed_local_paths))
 
     # make new directories
@@ -307,7 +313,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
                 with open(lp, 'wb') as fob:
                     for chunk in rsp.iter_content(1024):
                         fob.write(chunk)
-                a, b = lp.split(os.path.sep)[-2:]
+                a, b = lp.split(os.path.sep)[:-2]
                 db.cur.execute(usql, (os.path.join(a, b), dbid))
                 successes += 1
             except Exception as e:
@@ -329,8 +335,8 @@ def main():
     it = peep.card_db.cur.execute("SELECT * FROM cards").fetchall()
 
     # for testing populate_links
-    peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
-    peep.card_db.con.commit()
+    #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
+    #peep.card_db.con.commit()
     # # # # # # #
 
     populate_links(card_counts(__db_card_count__.keys()[0]))
