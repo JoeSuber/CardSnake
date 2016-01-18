@@ -278,7 +278,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     for w in real_work[:min(attempt, quant_left)]:
         # windows compatibility hack (win OS hates the string 'CON'):
         tag = ''
-        if (w['code'] == 'CON') and 'windows' in os.environ['OS'].lower():
+        if (w['code'] == 'CON') and ('nt' in os.name):
             tag = 'win'
         # preserve unique origination information in the filename:
         q = w['pic_link'].split("/")
