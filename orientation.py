@@ -194,22 +194,6 @@ def main():
     #display(find_sames(ups, ids), showall=False)
     bring_up()
 
-"""
-29411 58822
-uniqelen= 56919
-quantity of duplicate dct is 1017
-ARC or arc has many wrong pics-to-titles, many confused with ARB arb
-9e 9eb 8e 8eb problems too
-will try matching by name first
-"""
-
-"""
-new proceedure:
-given: A) a set of local card names given by mtgjson code
-given: B) map of infoCodes: lists of lines from mtginfo webpage
-
-the
-"""
 
 if __name__ == "__main__":
     exit(main())
