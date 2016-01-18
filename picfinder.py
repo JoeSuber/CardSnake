@@ -93,7 +93,7 @@ def card_counts(counter_col, tackon=None):
         setname = peep.set_db.cur.execute("select name from set_infos where code=?", (kkk,)).fetchone()
         if mci is None:
             print("{} aka {}: has no magicCardsInfoCode.".format(setname['name'], kkk))
-        hits = [code for code, path in allhits if os.path.isfile(os.path.join(peep.__mtgpics__, path))]
+        hits = [code for code, path in allhits if path and os.path.isfile(os.path.join(peep.__mtgpics__, path))]
         current_counts[kkk] = len(hits)
         if (len(hits) != len(allhits)) or (old_counts[kkk] != current_counts[kkk]):
             peep.set_db.cur.execute("UPDATE {} SET {}=({}) WHERE {}='{}'".format(peep.__sets_t__,
