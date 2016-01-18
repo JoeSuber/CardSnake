@@ -20,7 +20,7 @@ import pprint
 
 __RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image-bottom-border at art-line
 
-peep.card_db.cur.execute("DROP TABLE orient")
+#peep.card_db.cur.execute("DROP TABLE orient")
 
 orient_db = peep.DBMagic(DBfn=peep.__sqlcards__,
                          DBcolumns={'orient': peep.createstr.format('orient', peep.__cards_key__)},
@@ -51,17 +51,24 @@ def cards(fs=peep.__mtgpics__):
 
 
 def add_dct_data(cardpaths):
-    print("starting dct of all {} items".format(len(cardpaths)))
+    """
+    sock away top and bottom dcts of pics as persistent 64-bit int
+    """
     datas = []
-    for k, v in cardpaths.viewitems():
-        im = cv2.equalizeHist(cv2.imread(v, cv2.IMREAD_GRAYSCALE))
-        height, width = im.shape[:2]
-        line = {'id': k, 'pic_path': v, 'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
-                'bot_dct': gmpy2.digits(dct_hint(im[height-width*__RAT__:height, :width]))}
-        datas.append(line)
-    print("obtained data, now committing to db")
-    orient_db.add_data(datas, 'orient', 'id')
-    orient_db.con.commit()
+    allin = orient_db.cur.execute("SELECT * from orient").fetchall()
+    print("dct-database has {} of {} possible rows. adding remainder".format(len(allin), len(cardpaths)))
+    if len(allin) < len(cardpaths):
+        for k, v in cardpaths.viewitems():
+            if not any([a['picpath'] == os.path.join(v.split(os.path.sep)[-2:]) for a in allin]):
+                im = cv2.equalizeHist(cv2.imread(v, cv2.IMREAD_GRAYSCALE))
+                height, width = im.shape[:2]
+                line = {'id': k, 'pic_path': v, 'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
+                        'bot_dct': gmpy2.digits(dct_hint(im[height-width*__RAT__:height, :width]))}
+                datas.append(line)
+    print("adding {} new lines of data to a previous {} lines".format(len(datas), len(allin)))
+    if datas:
+        orient_db.add_data(datas, 'orient', 'id')
+        orient_db.con.commit()
     return datas
 
 
@@ -132,8 +139,11 @@ def find_sames(dcts, ids):
 def showpics(ids, wait=0):
     for i in ids:
         r = peep.card_db.cur.execute("SELECT pic_path, code, name from cards where id=?", (i,)).fetchone()
-        cv2.imshow("{} {} {}".format(r['code'], r['name'], r['pic_path']),
-                   cv2.imread(os.path.join(peep.__mtgpics__, r['pic_path'])))
+        if r['pic_path']:
+            cv2.imshow("{} {} {}".format(r['code'], r['name'], r['pic_path']),
+                       cv2.imread(os.path.join(peep.__mtgpics__, r['pic_path'])))
+        else:
+            print("no pic: {} {}".format(r['name'], r['code']))
     return cv2.waitKey(wait)
 
 
@@ -153,6 +163,22 @@ def display(sameups, showall=False):
                 cv2.destroyAllWindows()
 
 
+def bring_up():
+    ch = ''
+    cards = peep.card_db.cur.execute("select id, pic_path, name from cards").fetchall()
+    while ch != 27:
+        results = []
+        txt = raw_input("Enter card name:  ")
+        if not txt:
+            continue
+        for c in cards:
+            if txt.lower() in c['name'].lower():
+                results.append(c['id'])
+        if results:
+            ch = showpics(results)
+        cv2.destroyAllWindows()
+
+
 def main():
     add_dct_data(cards())
     ups, dns, ids = npydcts()
@@ -165,7 +191,9 @@ def main():
     bs = big[:10, :2]
     uniq = np.setxor1d(uar, dar)
     print "uniqelen=", len(uniq)
-    display(find_sames(ups, ids), showall=False)
+    #display(find_sames(ups, ids), showall=False)
+    bring_up()
+
 """
 29411 58822
 uniqelen= 56919
