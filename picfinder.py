@@ -111,40 +111,58 @@ def card_counts(counter_col):
     return needs_links
 
 
-def num_from_urls(urls, num):
+def num_from_urls(urls, num, layout):
     # num is actually text
     # must split it out to avoid finding '1' in '100'
     for u in urls:
         #print "urls u:", u
-        if num == u.split('/')[-1].split('.jpg')[0]:
+        if num == u.split('/')[-1].split('.jpg')[0].strip():
             return u
     return False
 
 
 def populate_links(setcodes):
-    sql = '''SELECT id, name, imageName, number from {} where code=?'''.format(peep.__cards_t__)
+    sql = '''SELECT id, name, imageName, number, layout, code from {} where code=?'''.format(peep.__cards_t__)
     usql = '''UPDATE {} SET pic_link=? WHERE id=?'''.format(peep.__cards_t__)
+    oddities = ["phenomenon", "plane", "token", "scheme", "vanguard"]
+    numberskip = ["CPK", "9ED", "8ED", "CST"]
+    extrastuff = {"9ED": "9eb", "8ED": "8eb"}
+    oddballs = defaultdict(list)
     with open("local_mias", 'wb') as fob:
         fob.write("list of unmatched local database items:\n")
+
     for s, mci in setcodes.viewitems():
         if mci is None:
             print("ATTENTION: {} has no magiccards.info code, and will get no pics from there!".format(s))
             continue
         work = deque(peep.card_db.cur.execute(sql, (s,)).fetchall())
+
+        for x in xrange(len(work)):
+            w = work.pop()
+            if w['layout'] in oddities:
+                oddballs[w['layout']].append({k: w[k] for k in w.keys()})
+            else:
+                work.appendleft(w)
+
         starting_work = len(work)
         links = setlist_links(mci)
-        if len(links) < starting_work:
-            box_set_code = mci[:2] + 'b'
-            links.update(setlist_links(box_set_code))
+        if s in extrastuff.keys():
+            links.update(setlist_links(extrastuff[s]))
+        # links are from web, work is from local
+        if len(links) != starting_work:
             msg = u"{} aka {}: has {} web-based, but {} local items\n".format(s, mci, len(links), starting_work)
             with open("local_mias", 'a+') as fob:
                 fob.write(msg)
+
         # try to match by card number in url
         for x in xrange(len(work)):
             w = work.pop()
+            if w['code'] in numberskip:
+                work.appendleft(w)
+                continue
             num, result = w['number'], False
             if num:
-                result = num_from_urls(links.keys(), w['number'])
+                result = num_from_urls(links.keys(), num.strip(), w['layout'])
             if result:
                 peep.card_db.cur.execute(usql, (result, w['id']))
                 links.pop(result)
@@ -159,12 +177,12 @@ def populate_links(setcodes):
         # try matching to href links by exact card-names in database
         revlinks = defaultdict(list)
         for k, v in links.viewitems():
-            revlinks[v.encode('utf-8')].append(k)
-        for name_col in ['name']:
+            revlinks[v].append(k)
+        for name_col in ['name']:       # used to match against 'imageName' as well. might go back to that.
             for x in xrange(len(work)):
                 w = work.pop()
                 try:
-                    peep.card_db.cur.execute(usql, (revlinks[w[name_col].encode('utf-8')].pop(), w['id']))
+                    peep.card_db.cur.execute(usql, (revlinks[w[name_col]].pop(), w['id']))
                 except IndexError or KeyError as e:
                     #print(u"no exact match from {} column for {} ".format(name_col, w[name_col]))
                     work.appendleft(w)
@@ -183,11 +201,8 @@ def populate_links(setcodes):
         # what remains of work doesn't match anything exactly.
         # now use Levenshtein distance against names.
 
-        for w in work:
-            synthlink = __mci_jpg__.format(mci, w['number'])
-            msg = u"{}   -{}-\n".format(synthlink, w['name'])
-            with open("local_mias", 'a+') as fob:
-                fob.write(msg)
+        for x in xrange(len(work)):
+            w = work.pop()
             scored = []
             for name, link in revlinks.viewitems():
                 try:
@@ -196,17 +211,38 @@ def populate_links(setcodes):
                 except UnicodeDecodeError as e:
                     print(u"{} :  -{}-  vs -{}-".format(e, w['name'].encode('utf-8', errors='replace'),
                                                         name.encode('utf-8', errors='replace')))
+                    scored.append((name, leven.distance(w['name'].encode('utf-8', errors='replace'),
+                                                        name.encode('utf-8', errors='replace'))))
             if not scored:
+                work.appendleft(w)
                 continue
             winner, points = sorted(scored, key=itemgetter(1))[0]
-            if points < 5:
-                if revlinks[winner]:
-                    winning_link = revlinks[winner].pop()
-                    print(u"{}  - close enough match: (mtginfo)'{}'  ==  '{}'(local) SCORE: {}"
-                          .format(winning_link, winner, w['name'], points))
-                    peep.card_db.cur.execute(usql, (winning_link, w['id']))
+            if (points < 5) and revlinks[winner]:
+                winning_link = revlinks[winner].pop()
+                print(u"{}  - close enough match: (mtginfo)'{}'  ==  '{}'(local) SCORE: {}"
+                      .format(winning_link, winner, w['name'], points))
+                peep.card_db.cur.execute(usql, (winning_link, w['id']))
+            else:
+                work.appendleft(w)
+
+        # looks like the end of the line. Record remaining work.
+        if work:
+            msg = u"for set: {} aka {}, after all efforts, {} of {} items remain:"\
+                   .format(s, mci, len(work), starting_work)
+            print(msg)
+            with open("local_mias", 'a+') as fob:
+                fob.write(msg + u"\n")
+        for n, w in enumerate(work):
+            msg = u"{}: {} | {} | {} | {}".format(n+1, s, w['name'], w['number'], w['id'])
+            print(msg)
+            with open("local_mias", 'a+') as fob:
+                fob.write(msg + u"\n")
+
+    with open("oddballs.json", 'wb') as odd:
+        json.dump(oddballs, odd)
 
         #todo: use magiccards.info 'extras' page to do more final matching
+        #http://magiccards.info/extras.html
 
     peep.card_db.con.commit()
 

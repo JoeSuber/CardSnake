@@ -24,6 +24,15 @@ def rall(t='cards', db=peep.card_db):
     return db.cur.execute("SELECT * from {}".format(t)).fetchall()
 
 
+def linknull(codes, db=None, t='cards'):
+    if db is None:
+        db = peep.card_db
+    for n, c in enumerate(codes):
+        db.cur.execute("UPDATE {} SET pic_path=NULL, pic_link=NULL WHERE code=?".format(t), (c,))
+    db.con.commit()
+    print("{} had pic_path set null".format(codes))
+
+
 def look(row_object, *stuff):
     return [row_object[s] for s in stuff]
 
@@ -62,8 +71,8 @@ def codeinfo():
     rows = peep.set_db.cur.execute("SELECT code, name, magicCardsInfoCode, card_count from set_infos").fetchall()
     for r in rows:
         codes[r['code']] = r['magicCardsInfoCode']
-    for k, v in mcimap.viewitems():
-        if k in codes.values():
+    for k, v in codes.items():
+        if v in mcimap.values():
             codes.pop(k)
     with open(peep.__notmci__, 'wb') as fob:
         json.dump(codes, fob)
@@ -77,6 +86,16 @@ def listset(code):
 
 
 if __name__ == "__main__":
-    pprint.pprint(cols())
+    pprint.pprint("columns: {}".format(cols()))
     pprint.pprint(jsoninfo())
     pprint.pprint(codeinfo())
+    #oddities = ["phenomenon", "plane", "token", "scheme", "vanguard"]
+    #linknull(['9ED', '8ED', 'CPK', 'S00', 'DD2', 'CST', 'PC2', 'HOP'])
+
+    for r in rall(t='cards'):
+        if r['code'] == '9ED':
+            print("       *   *     *   *  ")
+            p = ["{}: {}".format(a, r[a]) for a in r.keys() if r[a]]
+            for l in p:
+                print l
+            #print r['layout'], r['name'], r['code'], r['pic_link']
