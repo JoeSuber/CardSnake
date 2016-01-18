@@ -17,8 +17,6 @@ import requests
 import grequests
 from collections import Counter
 import time
-import gmpy2
-from gmpy2 import mpz
 
 DEBUG = True
 __author__ = 'suber1'
@@ -28,14 +26,11 @@ __sqlcards__ = os.getcwd() + os.sep + 'mtg_cards' + __sqlext__
 __sqlfiles__ = [__sqlsets__, __sqlcards__]
 __mtgpics__ = os.getcwd() + os.sep + 'pics'
 __needs__ = os.getcwd() + os.sep + 'needs_pic_links.json'
-__tackon__ = os.getcwd() + os.sep + 'tack_on_codes.txt'
-__mcisite__ = os.getcwd() + os.sep + 'not_local_codes.json'
-__notmci__ = os.getcwd() + os.sep + 'not_mci_codes.json'
 __jsonsets__ = 'http://mtgjson.com/json/SetCodes.json'
 __jsonupdate__ = 'http://mtgjson.com/json/changelog.json'
 __one_set__ = 'http://mtgjson.com/json/{}.json'
-__req_limit__ = 21          # can the server handle getting pounded by this many?
-__test_quant__ = 0          # set to zero for full run
+__req_limit__ = 21          # can the web server handle getting pounded by this many?
+__test_quant__ = 0          # set to zero for normal full run
 __max_errors__ = 0          # set positive to explore new import data
 __last_update__ = os.getcwd() + os.sep + 'last_update.json'
 __set_hdr_excluded__ = [u'cards', u'booster']
@@ -52,9 +47,7 @@ __types__ = {"<type 'list'>": 'json',
              "<type 'float'>": 'REAL',
              "<type 'int'>": 'INTEGER',
              "<type 'dict'>": 'json',
-             "<type 'bool'>": 'TEXT',
-             "<type 'mpz'>": 'mpz'}
-
+             "<type 'bool'>": 'TEXT'}
 
 
 class DBMagic (object):
@@ -73,10 +66,8 @@ class DBMagic (object):
         if not os.path.isdir(os.path.dirname(self.DBfn)):
             os.makedirs(os.path.dirname(self.DBfn))
         sqlite3.register_converter("json", json.loads)
-        sqlite3.register_converter("mpz", gmpy2.mpz)
         sqlite3.register_adapter(list, json.dumps)
         sqlite3.register_adapter(dict, json.dumps)
-        sqlite3.register_adapter(mpz, gmpy2.digits)
         self.con = sqlite3.connect(self.DBfn, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
         self.con.row_factory = sqlite3.Row
         self.con.text_factory = sqlite3.OptimizedUnicode
@@ -116,8 +107,7 @@ class DBMagic (object):
 
     def add_data(self, data, tbl, key_column=None):
         """
-        for populating database with 'official' values.
-        for locally changing data, probably should use some other method
+        populate database with list-of-dict values for dict.keys() that are in db-columns
         Parameters
         ----------
         data - list of dict cum json objects returned from requests whose wanted keys have been made DB column names
@@ -126,7 +116,8 @@ class DBMagic (object):
 
         Returns
         -------
-        Massive side effect = database entry.  Note this isn't an UPSERT, but similar
+        side effect = database entry.  Note this isn't an UPSERT, but similar because we only
+        replace the cells in the given columns. sqlite3 has no native UPSERT command.
         """
         n, error_count = -1, 0
         if key_column is None:
@@ -139,7 +130,6 @@ class DBMagic (object):
 
         approved_columns = self.show_columns(tbl)
         for n, line in enumerate(data):
-            #print("* {}".format(n))
             line_item = {k: v for k, v in line.viewitems() if k in approved_columns}
             SQL = '''INSERT OR REPLACE INTO {}({}) VALUES({})'''.format(str(tbl), ', '.join(line_item.keys()),
                                                                         ':' + ', :'.join(line_item.keys()))
@@ -147,12 +137,11 @@ class DBMagic (object):
                 self.cur.execute(SQL, line_item)
             except (sqlite3.OperationalError, sqlite3.InterfaceError) as e:
                 error_count += 1
-                print
                 print("error: {} ***********  {}   len={}  >>> {}    *******".format(error_count, n, len(line_item), e))
                 print(SQL)
                 print(line_item)
                 if error_count > __max_errors__:
-                    print("** too many problems to ignore. exiting, harshly **")
+                    print("** data entry has too many problems to ignore. exiting, harshly **")
                     exit(1)
                 continue
         self.con.commit()
@@ -166,22 +155,6 @@ set_db = DBMagic(DBfn=__sqlsets__,
 card_db = DBMagic(DBfn=__sqlcards__,
                   DBcolumns={__cards_t__: createstr.format(__cards_t__, __cards_key__)},
                   DB_DEBUG=DEBUG)
-
-
-def bootup():
-    """
-    Returns the bases and paths of required items needed to run this thing.
-    magiccards.info uses some different set codes for their images, needed for downloads.
-    Luckily the json data has those alternate dirnames in there somewhere.
-    -------
-    """
-    homedir = os.getcwd()
-    if not os.path.isdir(__mtgpics__):
-        os.mkdir(__mtgpics__)
-    picdir = __mtgpics__
-    return homedir, picdir, \
-           [unicode(q.basename()) for q in path.path(homedir).files('*' + __sqlext__)], \
-           [unicode(p.basename()) for p in path.path(picdir).dirs()]
 
 
 def asynch_getter(unsent, groupsize_limit=None, DBG=DEBUG):
@@ -237,13 +210,9 @@ def column_parser(datas, exclusions=None, DEBUG=DEBUG):
 
 def column_type_parser(datas, exclusions=None, types_map=None, DEBUG=DEBUG):
     """
-     supply columns & types that need to be added to db from import data
-    Parameters
-    ----------
+    supply columns & types that need to be added to db from import data
     types_map: user created {'python type() output as string': 'sqlite-data-type', ...}
-
-    Returns
-    -------
+    - returns -
     type_defs: {'column-name': 'appropriate sqlite-data-type', ...}
     """
     if types_map is None:
@@ -275,25 +244,30 @@ def check_for_updates(update_url, oldfn, need_all=False, DBG=DEBUG):
 
     Returns
     -------
-    list of set-codes that need to be updated since the last successful check
+    list of unique set-codes that need to be updated since the last successful check
     """
     newness = __newness__
     check_codes = []
+    most_recent = u"0.0.0"
+    # see if there have been previous updates
     try:
         with open(oldfn, mode='rb') as fob:
             old_stuff = json.load(fob)
             most_recent = old_stuff[0][u"version"]
     except Exception as e:
-        print("{}".format(e))
-        print("couldn't use changes log file ({})".format(oldfn))
+        print("{}: couldn't use changes log file ({})".format(e, oldfn))
         need_all = True
     if need_all:
         most_recent = u"0.0.0"
     old_version = [int(a) for a in most_recent.split(u".")]
-    req_new = requests.get(update_url).json()
-    if DBG:
-        print("*********************** log file stuff ******")
-        print("processed: {}    most recent from web: {}".format(most_recent, req_new[0][u'version']))
+    # get update file
+    try:
+        req_new = requests.get(update_url).json()
+    except Exception as e:
+        print("{}: couldn't obtain recent updates from: {}".format(e, update_url))
+        return check_codes
+    print("latest updates version processed locally: {} \n   *   *   *  newest version available: {}"
+          .format(most_recent, req_new[0][u'version']))
     i = 0
     for i in xrange(len(req_new)):
         new_version = [int(a) > b for a, b in zip(req_new[i][u'version'].split(u"."), old_version)]
@@ -307,28 +281,18 @@ def check_for_updates(update_url, oldfn, need_all=False, DBG=DEBUG):
         with open(oldfn, mode='wb') as wob:
             json.dump(req_new, wob)
     except Exception as e:
-        print("{}".format(e))
-        print("couldn't save the changes log as {}, so updates won't be correct.".format(oldfn))
+        print("{}: couldn't save the changes log as {}".format(e, oldfn))
 
     check_codes = list(set(check_codes))
     if DBG:
         print("there are {} unprocessed updates from {} ".format(i, update_url))
-        print("{} set-codes needed to bring it all up-to-date".format(len(check_codes)))
     return check_codes
 
 
-def starting_sets(sql_dbs):
-    setcodes, needs = [], False
-    if len(sql_dbs) != len(__sqlfiles__):
-        print("setup: missing required database files: {}".format([f for f in __sqlfiles__ if f not in sql_dbs]))
-        print("Getting set codes from: {}".format(__jsonsets__))
-        setcodes = requests.get(__jsonsets__).json()
-        needs = True
-    print("Checking for new or updated set codes at: {}".format(__jsonupdate__))
-    return list(set(setcodes + check_for_updates(__jsonupdate__, __last_update__, need_all=needs)))
-
-
 def info_grubber(unsent_greq, datas=None, tries=10):
+    """
+    don't (always) take no for an answer
+    """
     if datas is None:
         datas = []
     fails = []
@@ -377,10 +341,37 @@ def deckify(dats):
     return deck
 
 
+def starting_sets(sql_dbs):
+    """
+    looks at web for all required set-codes that need to be added / updated
+    """
+    setcodes, needs = [], False
+    if not len(sql_dbs):
+        print("setup: missing required database files: {}".format([f for f in __sqlfiles__ if f not in sql_dbs]))
+        print("Getting all set codes from: {}".format(__jsonsets__))
+        setcodes = requests.get(__jsonsets__).json()
+        needs = True
+    print("Checking for new or updated set codes at: {}".format(__jsonupdate__))
+    return list(set(setcodes + check_for_updates(__jsonupdate__, __last_update__, need_all=needs)))
+
+
+def bootup():
+    """
+    Returns the bases and paths of required items needed to run this thing.
+    """
+    homedir = os.getcwd()
+    if not os.path.isdir(__mtgpics__):
+        os.mkdir(__mtgpics__)
+    picdir = __mtgpics__
+    return homedir, picdir, \
+           [unicode(q.basename()) for q in path.path(homedir).files('*' + __sqlext__)], \
+           [unicode(p.basename()) for p in path.path(picdir).dirs()]
+
+
 def main():
     homedir, picdir, sqldbs, picsets = bootup()
 
-    if (DEBUG and (len(sqldbs) == len(__sqlfiles__))):
+    if DEBUG:
         print("using existing sqlite db fns: {}".format(sqldbs))
 
     urls = [__one_set__.format(s) for s in xando(starting_sets(sqldbs))]

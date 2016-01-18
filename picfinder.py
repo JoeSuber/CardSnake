@@ -36,6 +36,14 @@ __mci_jpg__ = __mci_front__ + '{}/{}.jpg'
 __mci_set_stub__ = "http://magiccards.info/{}/en.html"
 __mci_parser__ = '<td><a href="/{}/en/'
 
+# json data has some strangeness in it:
+# oddities are included in some card sets along with normal cards. key=='layout'...
+oddities = ["phenomenon", "plane", "token", "scheme", "vanguard"]
+# these sets include duplicate numbers, so matching by name only is required:
+numberskip = ["CPK", "9ED", "8ED", "CST"]
+# these keys need links from these vals in addition to the json given 'magicCardsInfoCode'
+extrastuff = {"9ED": "9eb", "8ED": "8eb"}
+
 
 def setcodeinfo():
     """
@@ -47,7 +55,7 @@ def setcodeinfo():
 
 def linkup(line):
     # in: '    <td><a href="/isd/en/2.html">Angel of Flight Alabaster</a></td>'
-    # out: ('Angel of Flight Alabaster', http://magiccards.info/scans/en/isd/2.jpg')
+    # out: ('Angel of Flight Alabaster', 'http://magiccards.info/scans/en/isd/2.jpg')
     a, b = line.split('.html">')
     ms, num = a.split('    <td><a href="/')[1].split('/en/')
     name = b.split('</a>')[0].strip()
@@ -57,36 +65,24 @@ def linkup(line):
 def setlist_links(mci_setcode):
     """
     mci_setcode: string from database ie 'isd'
-    return: for all images in set {'Name of Card': 'http://address-to-image.jpg', ...}
+    return: links for all images in set {'Name of Card': 'http://address-to-image.jpg', ...}
     """
     ri = requests.get(__mci_set_stub__.format(mci_setcode)).iter_lines()
     return dict([linkup(i) for i in ri if __mci_parser__.format(mci_setcode) in i])
 
 
-def card_counts(counter_col):
+def card_counts(counter_col, tackon=None):
     """
-    returns a dict of codes that need to be looked at. A hacked up thing to be sure.
-    looks at (and generates) a text file the user can edit to add magiccards.info codes
-    missing from the mtgjson import data. Also makes us look at all set codes missing local
-    images or that have a new number of items since last checked.
+    return {set-code: mci-code, ...} for all set-codes missing local images or that
+    have a new number of items since cards_counts last checked the database.
     """
-    current_counts, needs_links, tackon = {}, {}, {}
-    try:
-        with open(peep.__tackon__, 'rU') as fob:
-            lines = fob.readlines()
-    except IOError:
-        lines = []
-    for l in lines:
-        chunks = l.strip().split(': ')
-        if len(chunks) > 2:
-            tackon[chunks[1].strip()] = chunks[2].strip()
-    print ("tackon dict: {}".format(tackon))
+    current_counts, needs_links = {}, {}
+    if tackon is None:
+        tackon = {}
+    # print ("tackon dict: {}".format(tackon))
 
     old_counts = dict(peep.set_db.cur.execute("select {},{} from {}".format(u'code', counter_col,
                                                                             peep.__sets_t__)).fetchall())
-    # blank the file so it doesn't just repeat forever
-    with open(peep.__tackon__, 'wb') as fob:
-        fob.write("\n")
 
     for kkk, mci in setcodeinfo().viewitems():
         if (mci is None) and (kkk in tackon.keys()):
@@ -96,10 +92,8 @@ def card_counts(counter_col):
                                            .format(peep.__cards_t__), (kkk,)).fetchall()
         setname = peep.set_db.cur.execute("select name from set_infos where code=?", (kkk,)).fetchone()
         if mci is None:
-            print("{} aka {}: has no magicCardsInfoCode. Edit {} to fix".format(setname['name'], kkk, peep.__tackon__))
-            with open(peep.__tackon__, 'a+') as fob:
-                fob.write("{}: {}: {}".format(setname['name'], kkk, '\n'))
-        hits = [code for code, path in allhits if path]
+            print("{} aka {}: has no magicCardsInfoCode.".format(setname['name'], kkk))
+        hits = [code for code, path in allhits if os.path.isfile(os.path.join(peep.__mtgpics__, path))]
         current_counts[kkk] = len(hits)
         if (len(hits) != len(allhits)) or (old_counts[kkk] != current_counts[kkk]):
             peep.set_db.cur.execute("UPDATE {} SET {}=({}) WHERE {}='{}'".format(peep.__sets_t__,
@@ -124,9 +118,6 @@ def num_from_urls(urls, num, layout):
 def populate_links(setcodes):
     sql = '''SELECT id, name, imageName, number, layout, code from {} where code=?'''.format(peep.__cards_t__)
     usql = '''UPDATE {} SET pic_link=? WHERE id=?'''.format(peep.__cards_t__)
-    oddities = ["phenomenon", "plane", "token", "scheme", "vanguard"]
-    numberskip = ["CPK", "9ED", "8ED", "CST"]
-    extrastuff = {"9ED": "9eb", "8ED": "8eb"}
     oddballs = defaultdict(list)
     with open("local_mias", 'wb') as fob:
         fob.write("list of unmatched local database items:\n")
@@ -256,12 +247,11 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
         skip = []
     sql = '''SELECT id, name, pic_path, pic_link, code from {}'''.format(peep.__cards_t__)
     usql = '''UPDATE {} SET pic_path=? WHERE id=?'''.format(peep.__cards_t__)
-    codemap = setcodeinfo()
     work = db.cur.execute(sql).fetchall()
     real_work = []
-    needs_link = defaultdict(list)
+    # needs_link = defaultdict(list)
     needed_ids, needed_local_paths, needed_links = [], [], []
-    already_here = defaultdict(list)
+    # already_here = defaultdict(list)
     new_dirs = Counter()
 
     # first filter out some causes of errors
@@ -271,32 +261,33 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
             continue
         # is there a link?
         if not w['pic_link']:
-            #print ("NO PIC LINK: {} of {}".format(w['name'], w['code']))
-            needs_link[w['code']].append(w['id'])
+            # print ("NO PIC LINK: {} of {}".format(w['name'], w['code']))
+            # needs_link[w['code']].append(w['id'])
             continue
         # is the required file present and not empty?
         if w['pic_path']:
             prospect = os.path.join(fs_stub, w['pic_path'])
             if os.path.isfile(prospect) and os.stat(prospect).st_size > 10:
-                already_here[w['code']].append(prospect)
+                # already_here[w['code']].append(prospect)
                 continue
         # if none of above, add to real_work
         real_work.append(w)
 
-    #fix the missing links at a later date, perhaps. Recording ids
-    with open(peep.__needs__, 'wb') as fob:
-        json.dump(needs_link, fob)
-
     quant_left = len(real_work)
-    # go to work on work
+    # go to work on (some portion of) real work
     for w in real_work[:min(attempt, quant_left)]:
+        # windows compatibility hack (win OS hates the string 'CON'):
         tag = ''
         if (w['code'] == 'CON') and 'windows' in os.environ['OS'].lower():
             tag = 'win'
-        needed_local_paths.append(os.path.join(fs_stub, w['code']+tag, w['pic_link'].split('/')[-1]))
+        # preserve unique origination information in the filename:
+        needed_local_paths.append(os.path.join(fs_stub, w['code'] + tag, "-".join(w['pic_link'].split("/")[:-2])))
         needed_ids.append(w['id'])
         needed_links.append(w['pic_link'])
-        new_dirs[os.path.join(fs_stub, w['code']+tag)] += 1
+        new_dirs[os.path.join(fs_stub, w['code'] + tag)] += 1
+
+    # check that all filenames are unique
+    assert(len(set(needed_local_paths)) == len(needed_local_paths))
 
     # make new directories
     for dir in new_dirs.keys():
@@ -309,7 +300,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
 
     successes = 0
 
-    # take responses and turn into files, record success in database
+    # take responses and turn into files, record success in database by recording fs path
     for num, (lp, dbid, rsp) in enumerate(izip(needed_local_paths, needed_ids, resps)):
         if rsp.status_code == 200:
             try:
