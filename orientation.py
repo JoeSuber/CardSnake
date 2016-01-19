@@ -194,6 +194,5 @@ def main():
     #display(find_sames(ups, ids), showall=False)
     bring_up()
 
-
 if __name__ == "__main__":
     exit(main())

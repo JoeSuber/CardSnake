@@ -291,12 +291,12 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     try:
         assert(len(set(needed_local_paths)) == len(needed_local_paths))
     except AssertionError:
-        for p, l in zip(needed_local_paths, needed_links):
+        for p, l, i in zip(needed_local_paths, needed_links, needed_ids):
             idxs = [i for i, s in enumerate(needed_local_paths) if p == s]
-            if idxs > 1:
+            if len(idxs) > 1:
                 print("         *********")
                 for x in idxs:
-                    print needed_local_paths[x], " - ", needed_links[x]
+                    print needed_local_paths[x], " ", needed_links[x], " ", needed_ids[x]
         exit(1)
 
     # make new directories
