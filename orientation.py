@@ -55,19 +55,22 @@ def add_dct_data(cardpaths):
     """
     datas = []
     allin = orient_db.cur.execute("SELECT * from orient").fetchall()
-    print("dct-database has {} of {} possible rows. adding remainder".format(len(allin), len(cardpaths)))
-    if len(allin) < len(cardpaths):
+    qneed = [a['picpath'] is None for a in allin].count(True)
+    print("dct-database is missing data for {} of {} possible rows.".format(qneed, len(cardpaths)))
+    if qneed:
         for k, v in cardpaths.viewitems():
-            if not any([a['picpath'] == os.path.sep.join(v.split(os.path.sep)[-2:]) for a in allin]):
+            shortpath = os.path.sep.join(v.split(os.path.sep)[-2:])
+            if all([a['picpath'] != shortpath for a in allin]):
+                #print("+ {}".format(shortpath))
                 im = cv2.equalizeHist(cv2.imread(v, cv2.IMREAD_GRAYSCALE))
                 height, width = im.shape[:2]
-                line = {'id': k, 'pic_path': v, 'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
+                line = {'id': k, 'picpath': shortpath, 'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
                         'bot_dct': gmpy2.digits(dct_hint(im[height-width*__RAT__:height, :width]))}
                 datas.append(line)
     print("adding {} new lines of data to a previous {} lines".format(len(datas), len(allin)))
     if datas:
         orient_db.add_data(datas, 'orient', 'id')
-        orient_db.con.commit()
+        print("committed!")
     return datas
 
 
