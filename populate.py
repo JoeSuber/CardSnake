@@ -17,6 +17,7 @@ import requests
 import grequests
 from collections import Counter
 import time
+import numpy as np
 
 DEBUG = True
 __author__ = 'suber1'
@@ -68,8 +69,10 @@ class DBMagic (object):
         sqlite3.register_converter("json", json.loads)
         sqlite3.register_adapter(list, json.dumps)
         sqlite3.register_adapter(dict, json.dumps)
+        sqlite3.register_adapter(np.array, np.binary_repr)
         self.con = sqlite3.connect(self.DBfn, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
         self.con.row_factory = sqlite3.Row
+
         self.con.text_factory = sqlite3.OptimizedUnicode
         self.cur = self.con.cursor()
         self.newDB = False

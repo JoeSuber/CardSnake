@@ -4,7 +4,6 @@
 """
 lets generate some data to help determine which way is up when looking at a card image
 
-also, for examination of various generated relations, debugging etc
 """
 import sys
 reload(sys).setdefaultencoding("utf8")
@@ -87,10 +86,10 @@ def show(cardpaths):
 
 
 def getdcts():
-    dcts = orient_db.cur.execute("SELECT top_dct, bot_dct from orient").fetchall()
+    dcts = orient_db.cur.execute("SELECT top_dct, bot_dct, id from orient").fetchall()
     ups = [gmpy2.mpz(up['top_dct']) for up in dcts]
     downs = [gmpy2.mpz(down['bot_dct']) for down in dcts]
-    return ups, downs
+    return ups, downs, [i['id'] for i in dcts]
 
 
 def npydcts():
@@ -139,11 +138,14 @@ def find_sames(dcts, ids):
 def showpics(ids, wait=0):
     for i in ids:
         r = peep.card_db.cur.execute("SELECT pic_path, code, name from cards where id=?", (i,)).fetchone()
-        if r['pic_path']:
-            cv2.imshow("{} {} {}".format(r['code'], r['name'], r['pic_path']),
-                       cv2.imread(os.path.join(peep.__mtgpics__, r['pic_path'])))
+        if r:
+            if r['pic_path']:
+                cv2.imshow("{} {} {}".format(r['code'], r['name'], r['pic_path']),
+                           cv2.imread(os.path.join(peep.__mtgpics__, r['pic_path'])))
+            else:
+                print("no pic: {} {}".format(r['name'], r['code']))
         else:
-            print("no pic: {} {}".format(r['name'], r['code']))
+            print("{} is not an id code found in the database".format(i))
     return cv2.waitKey(wait)
 
 
@@ -179,20 +181,59 @@ def bring_up():
         cv2.destroyAllWindows()
 
 
+class Simile(object):
+    def __init__(self, u, d, i):
+        self.ups = np.vstack(np.array(u, dtype=object))
+        self.dwn = np.vstack(np.array(d, dtype=object))
+        self.ids = np.vstack(i)
+        self.gmp_hamm = np.vectorize(gmpy2.hamdist)
+
+    def hamm_ups(self, dct, cutval):
+        """
+        Parameters
+        ----------
+        dct: single mpz(uint64) to be compared against all the other values
+        cutval: the hamming distance threshold to filter the list with
+
+        Returns
+        -------
+        array of ids from the big list that have hamming distance less than cutval from 'dct'
+        """
+        return self.ids[np.where(self.gmp_hamm(self.ups,  dct) < cutval)]
+
+
 def main():
     add_dct_data(cards())
-    ups, dns, ids = npydcts()
-    uar, dar = np.vstack(np.array(ups, dtype=np.uint64)), np.vstack(np.array(dns, dtype=np.uint64))
-    s = len(uar)
-    print s, s*2
-    big = np.zeros((s, 5), np.uint64)
-    big[:s, :1] = uar
-    big[:s, 1:2] = dar
-    bs = big[:10, :2]
-    uniq = np.setxor1d(uar, dar)
-    print "uniqelen=", len(uniq)
-    #display(find_sames(ups, ids), showall=False)
-    bring_up()
+    a, b, c = getdcts()
+    simulate = Simile(a, b, c)
+    default_distance = 15
+    cap = cv2.VideoCapture(1)
+
+    while(True):
+        ret, frame = cap.read()
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        cv2.imshow('frame',gray)
+        if cv2.waitKey(1) & 0xFF == ord('c'):
+            dct = dct_hint(gray)
+            SEARCH = True
+            while SEARCH:
+                list1 = simulate.hamm_ups(dct, default_distance)
+                list2 = simulate.hamm_ups(dct, default_distance - 1)
+                if len(list1) < 2:
+                    default_distance += 2
+                    continue
+                if len(list2) > 1:
+                    default_distance -= 1
+                    continue
+                SEARCH = False
+                print("at distance = {}".format(default_distance))
+                ch = showpics(list1)
+            if ch == 27:
+                cv2.destroyAllWindows()
+                break
+            cv2.destroyAllWindows()
+        #display(find_sames(ups, ids), showall=False)
+        #bring_up()
 
 if __name__ == "__main__":
     exit(main())

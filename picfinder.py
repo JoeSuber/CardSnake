@@ -339,8 +339,8 @@ def main():
     it = peep.card_db.cur.execute("SELECT * FROM cards").fetchall()
 
     # for testing populate_links
-    #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
-    #peep.card_db.con.commit()
+    peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
+    peep.card_db.con.commit()
     # # # # # # #
 
     populate_links(card_counts(__db_card_count__.keys()[0]))
