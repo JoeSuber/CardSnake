@@ -58,7 +58,7 @@ def add_dct_data(cardpaths):
     print("dct-database has {} of {} possible rows. adding remainder".format(len(allin), len(cardpaths)))
     if len(allin) < len(cardpaths):
         for k, v in cardpaths.viewitems():
-            if not any([a['picpath'] == os.path.join(v.split(os.path.sep)[-2:]) for a in allin]):
+            if not any([a['picpath'] == os.path.sep.join(v.split(os.path.sep)[-2:]) for a in allin]):
                 im = cv2.equalizeHist(cv2.imread(v, cv2.IMREAD_GRAYSCALE))
                 height, width = im.shape[:2]
                 line = {'id': k, 'pic_path': v, 'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),

@@ -4,9 +4,11 @@ populate.py is run to initially create and then keep updated a local sqlite data
 maintained at mtgjson.com. It can do this for any .json files, I think, parsing list and dict
 data-types as well as strings and ints.
 
-The updates only update what has changed after the initial run, so should be pretty low overhead
+The updates only update what the json file says has changed after the initial run, so should be pretty low overhead
 
 uses: http://mtgjson.com/json/changelog.json to update card db entries that have changed using the SET updater
+
+after running populate.py, run picfinder.py to check magiccards.info for downloadable pictures of cards
 """
 
 import os
@@ -72,7 +74,6 @@ class DBMagic (object):
         sqlite3.register_adapter(np.array, np.binary_repr)
         self.con = sqlite3.connect(self.DBfn, detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
         self.con.row_factory = sqlite3.Row
-
         self.con.text_factory = sqlite3.OptimizedUnicode
         self.cur = self.con.cursor()
         self.newDB = False

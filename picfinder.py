@@ -35,6 +35,7 @@ __mci_front__ = 'http://magiccards.info/scans/en/'
 __mci_jpg__ = __mci_front__ + '{}/{}.jpg'
 __mci_set_stub__ = "http://magiccards.info/{}/en.html"
 __mci_parser__ = '<td><a href="/{}/en/'
+__mci_sitemap__ = 'http://magiccards.info/sitemap.html'
 
 # json data has some strangeness in it:
 # oddities are included in some card sets along with normal cards. key=='layout'...
@@ -331,6 +332,24 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     return skip, quant_left - successes
 
 
+def mci_sitemap_parser(sm=__mci_sitemap__, ):
+    r = requests.get(sm)
+    MAIN_LINE = False
+    mci_codes = list()
+    if r.status_code != 200:
+        print("status code: {} ...No sitemap page from: {}".format(r.status_code, sm))
+        return []
+    for kk in r.iter_lines():
+        if MAIN_LINE:
+            for s in kk.split('<small style="color: #aaa;">'):
+                mci_codes.append(s.split('</small></li><')[0])
+            return mci_codes[1:]
+
+        if '<small style="color: #aaa;">en</small></h2>' in kk:
+            MAIN_LINE = True
+    return []
+
+
 def main():
     peep.card_db.add_columns(peep.__cards_t__, __db_pic_col__)
     peep.card_db.add_columns(peep.__cards_t__, __db_link__)
@@ -339,19 +358,27 @@ def main():
     it = peep.card_db.cur.execute("SELECT * FROM cards").fetchall()
 
     # for testing populate_links
-    peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
-    peep.card_db.con.commit()
+    #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
+    #peep.card_db.con.commit()
     # # # # # # #
-
+    mci_codes_from_sitemap = mci_sitemap_parser()
+    for code, mci in setcodeinfo().viewitems():
+        if mci is None:
+            if code.lower() in mci_codes_from_sitemap:
+                print("Using magiccards.info sitemap to add '{}' to setcodes".format(code.lower()))
+                peep.set_db.cur.execute("UPDATE {} SET magicCardsInfoCode=(?) WHERE code=(?)"
+                                        .format(peep.__sets_t__), (code.lower(), code))
+    peep.set_db.con.commit()
     populate_links(card_counts(__db_card_count__.keys()[0]))
     trying = 100
     remains = len(it)
     baddies = []
-    print("attempting to get {} per download run:".format(trying))
+    print("attempting to get {} per download run:".format(trying, remains))
     while remains > 0:
         bad, remains = download_pics(attempt=trying, skip=baddies)
         if bad:
             baddies.append(bad)
+
 
     for bad in baddies:
         for i in it:
