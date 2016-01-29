@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-lets generate some data to help determine which way is up when looking at a card image
+generate some dct data if needed. Use it to help determine the most similar images to a captured image.
 
+run populate first, then picfinder, then run orientation and wait a few minutes while new dcts are added to database
 """
 import sys
 reload(sys).setdefaultencoding("utf8")
@@ -25,7 +26,7 @@ orient_db = peep.DBMagic(DBfn=peep.__sqlcards__,
                          DBcolumns={'orient': peep.createstr.format('orient', peep.__cards_key__)},
                          DB_DEBUG=True)
 
-orient_db.add_columns('orient', {'top_dct': 'TEXT', 'bot_dct': 'TEXT', 'picpath': 'TEXT'})
+orient_db.add_columns('orient', {'top_dct': 'TEXT', 'bot_dct': 'TEXT', 'picpath': 'TEXT', 'face': 'INTEGER'})
 
 
 def dct_hint(im, hsize=32):
@@ -48,6 +49,20 @@ def cards(fs=peep.__mtgpics__):
             cardmap[line['id']] = os.path.join(fs, line['pic_path'])
     return cardmap
 
+
+def needed_faces(cardmap):
+    needed = {}
+    for id in cardmap.viewkeys():
+        card_has_face = orient_db.cur.execute("SELECT faces FROM orient WHERE id=?", (id,)).fetchone()
+        if card_has_face is None:
+            needed[id] = cardmap[id]
+    return needed
+
+
+def find_faces(cardmap):
+    face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+    for id, cardpath in cardmap.viewkeys():
+        faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)), 1.3, 5)
 
 def add_dct_data(cardpaths):
     """
@@ -108,6 +123,18 @@ def idname(id):
 
 
 def mean_dct(ups, downs):
+    """
+    this is not used in main(), just for investigating the self-similarity of entire groups of images.
+
+    Parameters
+    ----------
+    ups: list of dct_hints of the upper part of a bunch of images
+    downs: as above, but the lower part
+
+    Returns
+    -------
+    tuple of three floats: mean of hamming distance of each up vs all other ups, ups vs each downs, downs vs downs
+    """
     upvsup, upvsdown, downvsdown = [], [], []
     for up in ups[12000:13000]:
         upvsup.append(np.mean(np.vstack([gmpy2.hamdist(up, u) for u in ups])))
@@ -159,7 +186,7 @@ def display(sameups, showall=False):
     """
     for sames in sameups.viewvalues():
         # compare names against first entry, only show when differences
-        if showall or any([s[0] != sames[0][0] for s in sames]):
+        if showall or any(s[0] != sames[0][0] for s in sames):
             ch = showpics([s[2] for s in sames])
             if ch == 27:
                 cv2.destroyAllWindows()
@@ -207,6 +234,7 @@ class Simile(object):
 
 def main():
     add_dct_data(cards())
+    add_face_data(needed_faces(cards()))
     a, b, c = getdcts()
     simulate = Simile(a, b, c)
     default_distance = 15
