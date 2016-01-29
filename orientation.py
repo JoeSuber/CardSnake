@@ -53,7 +53,7 @@ def cards(fs=peep.__mtgpics__):
 def needed_faces(cardmap):
     needed = {}
     for id in cardmap.viewkeys():
-        card_has_face = orient_db.cur.execute("SELECT faces FROM orient WHERE id=?", (id,)).fetchone()
+        card_has_face = orient_db.cur.execute("SELECT face FROM orient WHERE id=?", (id,)).fetchone()
         if card_has_face is None:
             needed[id] = cardmap[id]
     return needed
