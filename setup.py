@@ -8,5 +8,5 @@ setup(
         license='MIT',
         author='Joe Suber',
         author_email='joesuber@gmail.com',
-        description='scrape together data & images of Magic: the Gathering cards. Find them by similarity measures.'
+        description='scrape together data & images of Magic: the Gathering cards. Serve them up by similarity measures.'
 )
