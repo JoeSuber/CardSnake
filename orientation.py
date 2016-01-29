@@ -257,6 +257,7 @@ def main():
         if ch == ord('c'):
             dct = dct_hint(gray)
             SEARCH = True
+            ch = ''
             while SEARCH:
                 list1 = simulate.hamm_ups(dct, default_distance)
                 list2 = simulate.hamm_ups(dct, default_distance - 1)
@@ -272,6 +273,8 @@ def main():
         if ch == 27:
             cv2.destroyAllWindows()
             break
+        if ch == ord('c'):
+            cv2.destroyAllWindows()
         #display(find_sames(ups, ids), showall=False)
         #bring_up()
 
