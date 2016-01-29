@@ -60,9 +60,17 @@ def needed_faces(cardmap):
 
 
 def find_faces(cardmap):
+    if not cardmap:
+        return 0
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-    for id, cardpath in cardmap.viewkeys():
-        faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)), 1.3, 5)
+    for n, (id, cardpath) in enumerate(cardmap.viewkeys()):
+        faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)), 1.2, 5)
+        if faces:
+            print("{}: {} -- {}".format(n, len(faces), faces))
+            orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (len(faces), id))
+    orient_db.con.commit()
+    return len(cardmap)
+
 
 def add_dct_data(cardpaths):
     """
@@ -234,7 +242,7 @@ class Simile(object):
 
 def main():
     add_dct_data(cards())
-    add_face_data(needed_faces(cards()))
+    find_faces(needed_faces(cards()))
     a, b, c = getdcts()
     simulate = Simile(a, b, c)
     default_distance = 15
