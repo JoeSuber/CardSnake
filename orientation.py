@@ -50,14 +50,14 @@ def cards(fs=peep.__mtgpics__):
     return cardmap
 
 
-def needed_faces(cardmap, examine_zeros=True):
+def needed_faces(cardmap, examine_zeros=False):
     """
     filter cardmap to include only items that need examination for faces
     """
     needed = {}
     for id in cardmap.viewkeys():
         card_has_face = orient_db.cur.execute("SELECT face FROM orient WHERE id=?", (id,)).fetchone()[0]
-        if not card_has_face:
+        if card_has_face is None or (examine_zeros and not card_has_face):
             needed[id] = cardmap[id]
     return needed
 
@@ -265,7 +265,7 @@ class Simile(object):
 
 def main():
     add_dct_data(cards())
-    for nn, qq in find_faces(needed_faces(cards())).viewitems():
+    for nn, qq in find_faces(needed_faces(cards(), examine_zeros=True)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
     a, b, c = getdcts()
     simulate = Simile(a, b, c)
