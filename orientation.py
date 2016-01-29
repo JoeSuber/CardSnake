@@ -15,7 +15,7 @@ import gmpy2
 from gmpy2 import mpz
 import cv2
 import numpy as np
-from collections import defaultdict
+from collections import defaultdict, Counter
 import pprint
 
 __RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image-bottom-border at art-line
@@ -53,23 +53,26 @@ def cards(fs=peep.__mtgpics__):
 def needed_faces(cardmap):
     needed = {}
     for id in cardmap.viewkeys():
-        card_has_face = orient_db.cur.execute("SELECT face FROM orient WHERE id=?", (id,)).fetchone()
+        card_has_face = orient_db.cur.execute("SELECT face FROM orient WHERE id=?", (id,)).fetchone()[0]
         if card_has_face is None:
             needed[id] = cardmap[id]
     return needed
 
 
 def find_faces(cardmap):
+    facecount = Counter()
     if not cardmap:
-        return 0
+        return facecount
+    print("face finder will examine {} pictures, and store results in database".format(len(cardmap)))
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-    for n, (id, cardpath) in enumerate(cardmap.viewkeys()):
-        faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)), 1.2, 5)
-        if faces:
-            print("{}: {} -- {}".format(n, len(faces), faces))
-            orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (len(faces), id))
+    for n, (id, cardpath) in enumerate(cardmap.viewitems()):
+        faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)),
+                                              scaleFactor=1.165, minNeighbors=2)
+        print("{}: {} -- {}".format(n, len(faces), faces))
+        facecount[len(faces)] += 1
+        orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (len(faces), id))
     orient_db.con.commit()
-    return len(cardmap)
+    return facecount
 
 
 def add_dct_data(cardpaths):
@@ -242,8 +245,8 @@ class Simile(object):
 
 def main():
     add_dct_data(cards())
-    print len(needed_faces(cards()))
-    find_faces(needed_faces(cards()))
+    for nn, qq in find_faces(needed_faces(cards())).viewitems():
+        print("with {} face(s) --> {}".format(nn, qq))
     a, b, c = getdcts()
     simulate = Simile(a, b, c)
     default_distance = 15
