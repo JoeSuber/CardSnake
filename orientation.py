@@ -62,7 +62,7 @@ def needed_faces(cardmap, examine_zeros=False):
     return needed
 
 
-def find_faces(cardmap, scale=1.165, min_neighbor=2):
+def find_faces(cardmap, scale=1.35, min_neighbor=4):
     """
     Parameters
     ----------
@@ -88,6 +88,9 @@ def find_faces(cardmap, scale=1.165, min_neighbor=2):
     orient_db.con.commit()
     return facecount
 
+
+def list_only_faces(l1, l2, faced):
+    return [l for l in l1 if l in faced], [l for l in l2 if l in faced]
 
 def add_dct_data(cardpaths):
     """
@@ -265,26 +268,46 @@ class Simile(object):
 
 def main():
     add_dct_data(cards())
-    for nn, qq in find_faces(needed_faces(cards(), examine_zeros=True)).viewitems():
+    for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
     a, b, c = getdcts()
     simulate = Simile(a, b, c)
     default_distance = 15
     cap = cv2.VideoCapture(1)
-    print("- Press <c> to capture the camera image - ")
+    face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+    faces_list = orient_db.cur.execute("SELECT id FROM orient WHERE face > ?", (0,)).fetchall()
+    print("- Press <c> to capture & compare to all cards - ")
+    print("- Press <f> to only use cards with detected 'faces' in them -")
+
     while(True):
         ret, frame = cap.read()
+        FACE_ONLY = False
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         cv2.imshow('frame',gray)
         ch = cv2.waitKey(1) & 0xFF
+        if ch == ord('f'):
+            FACE_ONLY = True
+            ch = ord('c')
         if ch == ord('c'):
             dct = dct_hint(gray)
+            localface = face_cascade.detectMultiScale(cv2.equalizeHist(gray), scaleFactor=1.2, minNeighbors=3)
+            if len(localface):
+                img = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+                print("local faces: {}".format(localface))
+                for (x,y,w,h) in localface:
+                    cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
+                cv2.imshow("Faces", img)
             SEARCH = True
             ch = ''
+
             while SEARCH:
                 list1 = simulate.hamm_ups(dct, default_distance)
                 list2 = simulate.hamm_ups(dct, default_distance - 1)
-                if len(list1) < 2:
+                if FACE_ONLY:
+                    pass
+                    #list1, list2 = list_only_faces(list1, list2, faces_list)
+                    #print list1, list2
+                if len(list1) < 1:
                     default_distance += 2
                     continue
                 if len(list2) > 1:
@@ -293,6 +316,7 @@ def main():
                 SEARCH = False
                 print("at distance = {}".format(default_distance))
                 ch = showpics(list1)
+
         if ch == 27:
             cv2.destroyAllWindows()
             break
