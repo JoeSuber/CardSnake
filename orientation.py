@@ -50,24 +50,38 @@ def cards(fs=peep.__mtgpics__):
     return cardmap
 
 
-def needed_faces(cardmap):
+def needed_faces(cardmap, examine_zeros=True):
+    """
+    filter cardmap to include only items that need examination for faces
+    """
     needed = {}
     for id in cardmap.viewkeys():
         card_has_face = orient_db.cur.execute("SELECT face FROM orient WHERE id=?", (id,)).fetchone()[0]
-        if card_has_face is None:
+        if not card_has_face:
             needed[id] = cardmap[id]
     return needed
 
 
-def find_faces(cardmap):
+def find_faces(cardmap, scale=1.165, min_neighbor=2):
+    """
+    Parameters
+    ----------
+    cardmap: {database id: local/path/to/pic, ...}
+
+    Returns
+    -------
+    counter object showing the quantity of examined pics with a given number of faces detected.
+    side-effect: database column 'face' gets updated with quantity of faces found.
+    """
     facecount = Counter()
     if not cardmap:
         return facecount
-    print("face finder will examine {} pictures, and store results in database".format(len(cardmap)))
+    print("face finder will examine {} pictures, using scale={} minNeighbors={}"
+          .format(len(cardmap), scale, min_neighbor))
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
     for n, (id, cardpath) in enumerate(cardmap.viewitems()):
         faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)),
-                                              scaleFactor=1.165, minNeighbors=2)
+                                              scaleFactor=scale, minNeighbors=min_neighbor)
         print("{}: {} -- {}".format(n, len(faces), faces))
         facecount[len(faces)] += 1
         orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (len(faces), id))
@@ -177,6 +191,9 @@ def find_sames(dcts, ids):
 
 
 def showpics(ids, wait=0):
+    """
+    try to show pics given by a list of database ids
+    """
     for i in ids:
         r = peep.card_db.cur.execute("SELECT pic_path, code, name from cards where id=?", (i,)).fetchone()
         if r:
@@ -207,6 +224,9 @@ def display(sameups, showall=False):
 
 
 def bring_up():
+    """
+    user sees card images with names containing user input string
+    """
     ch = ''
     cards = peep.card_db.cur.execute("select id, pic_path, name from cards").fetchall()
     while ch != 27:
