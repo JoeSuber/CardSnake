@@ -4,7 +4,7 @@ setup(
         name='CardSnake',
         version='.1',
         packages=['requests', 'grequests', 'Levenshtein', 'gmpy2', 'numpy', 'cv2'],
-        url='http://www.31stcenturygames.com',
+        url='https://github.com/Joesuber/CardSnake',
         license='MIT',
         author='Joe Suber',
         author_email='joesuber@gmail.com',
