@@ -242,17 +242,19 @@ class Simile(object):
 
 def main():
     add_dct_data(cards())
+    print len(needed_faces(cards()))
     find_faces(needed_faces(cards()))
     a, b, c = getdcts()
     simulate = Simile(a, b, c)
     default_distance = 15
     cap = cv2.VideoCapture(1)
-
+    print("- Press <c> to capture the camera image - ")
     while(True):
         ret, frame = cap.read()
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         cv2.imshow('frame',gray)
-        if cv2.waitKey(1) & 0xFF == ord('c'):
+        ch = cv2.waitKey(1) & 0xFF
+        if ch == ord('c'):
             dct = dct_hint(gray)
             SEARCH = True
             while SEARCH:
@@ -267,10 +269,9 @@ def main():
                 SEARCH = False
                 print("at distance = {}".format(default_distance))
                 ch = showpics(list1)
-            if ch == 27:
-                cv2.destroyAllWindows()
-                break
+        if ch == 27:
             cv2.destroyAllWindows()
+            break
         #display(find_sames(ups, ids), showall=False)
         #bring_up()
 
