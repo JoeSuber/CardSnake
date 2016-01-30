@@ -46,7 +46,7 @@ get your command line to where you copied/cloned all the CardSnake files and typ
 
 >> python orientation.py
 
-(a camera view pops up. press <c> or <f>)
+(a camera view pops up. press 'c' or 'f') 
 
 Make funny faces into your web cam, or show it the art on a card. 
 
