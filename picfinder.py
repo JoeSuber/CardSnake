@@ -373,7 +373,7 @@ def main():
     trying = 100
     remains = len(it)
     baddies = []
-    print("attempting to get {} per download run:".format(trying, remains))
+    print("attempting to get {} per download run:".format(trying))
     while remains > 0:
         bad, remains = download_pics(attempt=trying, skip=baddies)
         if bad:
