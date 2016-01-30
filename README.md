@@ -47,7 +47,7 @@ get your command line to where you copied/cloned all the CardSnake files and typ
 >> python orientation.py
 
 (on the first run, it may take a while to calculate and store all the DCT data, maybe 20 minutes)
-(a camera view pops up. press 'c' or 'f') 
+(a camera view pops up. press 'c' or 'f' or 'Esc' to quit) 
 
 Make funny faces into your web cam, or show it the art on a card. It will show you what is most similar.
 
