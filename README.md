@@ -56,6 +56,6 @@ Update / check for new data by re-running the above stuff in order.
 It only updates what needs updating so it will be much faster.
 
 Notice that you now have a /CardSnake/pics/ sub-directory full of all the up to date card images (.jpg format). 
-Almost 29,500+ of them as of this date.
+29,500+ of them as of this date.
 
 Have fun!
