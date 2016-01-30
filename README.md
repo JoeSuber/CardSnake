@@ -12,7 +12,7 @@ https://opencv.org
 
 Find the 'cv2.so' (linux, OSX) or 'cv2.pyd' (windows) file.
 
-It is  in your opencv install directory, e.g.
+It is in your opencv install directory, e.g.
 
 > ../opencv/build/python/2.7/x86  (32-bit, for most windows installs)
 
@@ -47,13 +47,15 @@ get your command line to where you copied/cloned all the CardSnake files and typ
 >> python orientation.py
 
 (on the first run, it may take a while to calculate and store all the DCT data, maybe 20 minutes)
-(a camera view pops up. press 'c' or 'f' or 'Esc' to quit) 
+
+(when done, a camera view pops up. press 'c' or 'f' or 'Esc' to quit) 
 
 Make funny faces into your web cam, or show it the art on a card. It will show you what is most similar.
 
 Update / check for new data by re-running the above stuff in order. 
 It only updates what needs updating so it will be much faster.
 
-Notice that you have a /CardSnake/pics/ sub-directory full of all the card images.
+Notice that you now have a /CardSnake/pics/ sub-directory full of all the up to date card images (.jpg format). 
+Almost 29,500+ of them as of this date.
 
 Have fun!
