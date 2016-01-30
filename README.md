@@ -54,4 +54,6 @@ Make funny faces into your web cam, or show it the art on a card. It will show y
 Update / check for new data by re-running the above stuff in order. 
 It only updates what needs updating so it will be much faster.
 
+Notice that you have a /CardSnake/pics/ sub-directory full of all the card images.
+
 Have fun!
