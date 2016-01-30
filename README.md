@@ -14,21 +14,21 @@ Find the 'cv2.so' (linux, OSX) or 'cv2.pyd' (windows) file.
 
 It is in your opencv install directory, e.g.
 
-/opencv/build/python/2.7/x86  (32-bit, for most windows installs)
+> ../opencv/build/python/2.7/x86  (32-bit, for most windows installs)
 
 or
 
-/opencv/build/python/2.7/x64    (64-bit)
+> ../opencv/build/python/2.7/x64    (64-bit)
 
 copy the cv2.* file you find there to your python install dir:
 
-Python27/Lib/site-packages
+> ../Python27/Lib/site-packages
 
 You may need to get a few other python packages.
 
 From the command line, (on windows use: winkey-x [command prompt (admin)])
 
-pip install requests grequests python-Levenshtein gmpy2 numpy
+>pip install requests grequests python-Levenshtein gmpy2 numpy
 
 (stuff happens)
 
@@ -36,15 +36,15 @@ Now for the fun part!
 
 get your command line to where you copied/cloned all the CardSnake files and type:
 
-python populate.py
+>> python populate.py
 
 (stuff happens)
 
-python picfinder.py
+>> python picfinder.py
 
 (stuff happens for a few minutes)
 
-python orientation.py
+>> python orientation.py
 
 (a camera view pops up. press <c> or <f>)
 
