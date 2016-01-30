@@ -20,15 +20,17 @@ or
 
 /opencv/build/python/2.7/x64    (64-bit)
 
-copy the cv2.* file you find to your python install:
+copy the cv2.* file you find there to your python install dir:
 
 Python27/Lib/site-packages
 
-Then you may need to get a few python packages.
+You may need to get a few other python packages.
 
 From the command line, (on windows use: winkey-<x> [command prompt (admin)])
 
 pip install requests grequests python-Levenshtein gmpy2 numpy
+
+(stuff happens)
 
 Now for the fun part!
 
