@@ -10,13 +10,11 @@ import sys
 reload(sys).setdefaultencoding("utf8")
 import populate as peep
 import os
-import json
 import gmpy2
 from gmpy2 import mpz
 import cv2
 import numpy as np
 from collections import defaultdict, Counter
-import pprint
 
 __RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image-bottom-border at art-line
 

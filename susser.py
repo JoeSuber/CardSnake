@@ -1,3 +1,10 @@
+#!/usr/bin/env python -S
+# -*- coding: utf-8 -*-
+
+"""
+Experimenting with app UI
+"""
+
 import kivy
 kivy.require('1.9.1') # replace with your current kivy version !
 import cv2
