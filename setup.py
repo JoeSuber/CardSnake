@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(
         name='CardSnake',
         version='.1',
-        packages=['requests', 'grequests', 'Levenshtein', 'gmpy2', 'numpy', 'cv2'],
+        packages=['requests', 'grequests', 'python-Levenshtein', 'gmpy2', 'numpy'],
         url='https://github.com/Joesuber/CardSnake',
         license='MIT',
         author='Joe Suber',
