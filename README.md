@@ -12,7 +12,7 @@ https://opencv.org
 
 Find the 'cv2.so' (linux, OSX) or 'cv2.pyd' (windows) file.
 
-It is in your opencv install directory, e.g.
+It is  in your opencv install directory, e.g.
 
 > ../opencv/build/python/2.7/x86  (32-bit, for most windows installs)
 
