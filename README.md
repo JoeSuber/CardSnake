@@ -30,7 +30,7 @@ From the command line, (on windows use: winkey-x [command prompt (admin)])
 
 >pip install requests grequests python-Levenshtein gmpy2 numpy
 
-(stuff happens)
+(installer stuff happens)
 
 Now for the fun part!
 
@@ -46,10 +46,12 @@ get your command line to where you copied/cloned all the CardSnake files and typ
 
 >> python orientation.py
 
+(on the first run, it may take a while to calculate and store all the DCT data, maybe 20 minutes)
 (a camera view pops up. press 'c' or 'f') 
 
-Make funny faces into your web cam, or show it the art on a card. 
+Make funny faces into your web cam, or show it the art on a card. It will show you what is most similar.
 
-Update / check for new data by re-running the above stuff. It only updates what needs updating.
+Update / check for new data by re-running the above stuff in order. 
+It only updates what needs updating so it will be much faster.
 
 Have fun!
