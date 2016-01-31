@@ -14,7 +14,7 @@ import gmpy2
 from gmpy2 import mpz
 import cv2
 import numpy as np
-from collections import defaultdict, Counter
+from collections import defaultdict, Counter, deque
 
 __RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image-bottom-border at art-line
 
@@ -90,6 +90,7 @@ def find_faces(cardmap, scale=1.35, min_neighbor=4):
 def list_only_faces(l1, l2, faced):
     return [l for l in l1 if l in faced], [l for l in l2 if l in faced]
 
+
 def add_dct_data(cardpaths):
     """
     sock away top and bottom dcts of pics as persistent 64-bit int
@@ -129,10 +130,21 @@ def show(cardpaths):
     return ch
 
 
-def getdcts():
-    dcts = orient_db.cur.execute("SELECT top_dct, bot_dct, id from orient").fetchall()
+def getdcts(only_faces=False):
+    dcts = orient_db.cur.execute("SELECT top_dct, bot_dct, id, face FROM orient").fetchall()
     ups = [gmpy2.mpz(up['top_dct']) for up in dcts]
     downs = [gmpy2.mpz(down['bot_dct']) for down in dcts]
+    ids = [i['id'] for i in dcts]
+    if only_faces:
+        ups, downs, ids = deque(ups), deque(downs), deque(ids)
+        for line in dcts:
+            u, d, i = ups.pop(), downs.pop(), ids.pop()
+            if line['face']:
+                ups.appendleft(u)
+                downs.appendleft(d)
+                ids.appendleft(i)
+        ups, downs, ids = list(ups), list(downs), list(ids)
+
     return ups, downs, [i['id'] for i in dcts]
 
 
@@ -248,6 +260,7 @@ class Simile(object):
         self.ups = np.vstack(np.array(u, dtype=object))
         self.dwn = np.vstack(np.array(d, dtype=object))
         self.ids = np.vstack(i)
+        # vectorize lets gmpy2.hamdist get 'broadcast' over numpy arrays. speedily.
         self.gmp_hamm = np.vectorize(gmpy2.hamdist)
 
     def hamm_ups(self, dct, cutval):
@@ -264,16 +277,28 @@ class Simile(object):
         return self.ids[np.where(self.gmp_hamm(self.ups,  dct) < cutval)]
 
 
-def main():
+def init_and_check():
+    """
+    call this along with populate.py and picfinder.py to fill up database when running on remote server
+    """
     add_dct_data(cards())
     for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
+
+
+def main():
+    """
+    user can play with generated data & images on local machine.
+    """
+    init_and_check()
     a, b, c = getdcts()
     simulate = Simile(a, b, c)
+    d, e, f = getdcts(only_faces=True)
+    #todo: subclass Simile instead of re-running getdcts()
+    smiles = Simile(d, e, f)
     default_distance = 15
     cap = cv2.VideoCapture(1)
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-    faces_list = orient_db.cur.execute("SELECT id FROM orient WHERE face > ?", (0,)).fetchall()
     print("- Press <c> to capture & compare to all cards - ")
     print("- Press <f> to only use cards with detected 'faces' in them -")
 
@@ -281,7 +306,7 @@ def main():
         ret, frame = cap.read()
         FACE_ONLY = False
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        cv2.imshow('frame',gray)
+        cv2.imshow('frame', gray)
         ch = cv2.waitKey(1) & 0xFF
         if ch == ord('f'):
             FACE_ONLY = True
@@ -289,9 +314,9 @@ def main():
         if ch == ord('c'):
             dct = dct_hint(gray)
             localface = face_cascade.detectMultiScale(cv2.equalizeHist(gray), scaleFactor=1.2, minNeighbors=3)
+            # draw a captured image showing a box around detected faces
             if len(localface):
                 img = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-                print("local faces: {}".format(localface))
                 for (x,y,w,h) in localface:
                     cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
                 cv2.imshow("Faces", img)
@@ -299,24 +324,29 @@ def main():
             ch = ''
 
             while SEARCH:
-                list1 = simulate.hamm_ups(dct, default_distance)
-                list2 = simulate.hamm_ups(dct, default_distance - 1)
                 if FACE_ONLY:
-                    pass
-                    #list1, list2 = list_only_faces(list1, list2, faces_list)
-                    #print list1, list2
+                    # pull from only the database items that have detected faces <f>
+                    list1 = smiles.hamm_ups(dct, default_distance)
+                    list2 = smiles.hamm_ups(dct, default_distance - 1)
+                    print("faces only")
+                else:
+                    # pull from all database items <c>
+                    list1 = simulate.hamm_ups(dct, default_distance)
+                    list2 = simulate.hamm_ups(dct, default_distance - 1)
+                    print("everything")
                 if len(list1) < 1:
                     default_distance += 2
                     continue
-                if len(list2) > 1:
+                if len(list2) > 0:
                     default_distance -= 1
                     continue
                 SEARCH = False
                 print("at distance = {}".format(default_distance))
                 ch = showpics(list1)
 
-        if ch == 27:
+        if ch == 27:    # <esc>
             cv2.destroyAllWindows()
+            print("quitting orientation")
             break
         if ch == ord('c'):
             cv2.destroyAllWindows()
