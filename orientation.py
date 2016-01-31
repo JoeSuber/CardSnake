@@ -50,7 +50,8 @@ def cards(fs=peep.__mtgpics__):
 
 def needed_faces(cardmap, examine_zeros=False):
     """
-    filter cardmap to include only items that need examination for faces
+    filter cardmap to include only items that need examination for faces.
+    defaults to only examining 'null' valued, new items, not zeroes.
     """
     needed = {}
     for id in cardmap.viewkeys():
@@ -131,6 +132,9 @@ def show(cardpaths):
 
 
 def getdcts(only_faces=False):
+    """
+    takes the dry, text version of the dcts stored in the database and hydrates them into mpz() objects
+    """
     dcts = orient_db.cur.execute("SELECT top_dct, bot_dct, id, face FROM orient").fetchall()
     ups = [gmpy2.mpz(up['top_dct']) for up in dcts]
     downs = [gmpy2.mpz(down['bot_dct']) for down in dcts]
@@ -144,11 +148,14 @@ def getdcts(only_faces=False):
                 downs.appendleft(d)
                 ids.appendleft(i)
         ups, downs, ids = list(ups), list(downs), list(ids)
-
     return ups, downs, [i['id'] for i in dcts]
 
 
 def npydcts():
+    """
+    if we want numpy's version of unsigned, 64-bit integers to represent
+    the dct data then this is the ticket. (as opposed to gmpy2.mpz objects).
+    """
     dcts = orient_db.cur.execute("SELECT top_dct, bot_dct, id from orient").fetchall()
     ups = [np.uint64(up['top_dct']) for up in dcts]
     downs = [np.uint64(down['bot_dct']) for down in dcts]
@@ -188,8 +195,7 @@ def mean_dct(ups, downs):
 
 def find_sames(dcts, ids):
     """
-    Parameters
-    ----------
+    shows all the items that share each dct. a collision of sorts, from perfect similarity.
     dcts = [dct hash, ...]
     ids = [(name, code), ...] in corresponding order to 'dcts'
 
