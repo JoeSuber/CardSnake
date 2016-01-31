@@ -40,6 +40,7 @@ def dct_hint(im, hsize=32):
 
 
 def cards(fs=peep.__mtgpics__):
+    # joins unique part of path to local stub.
     cardmap = {}
     for line in peep.card_db.cur.execute("SELECT id, name, code, pic_path from cards").fetchall():
         #print("fs={}   picpath={}".format(fs, line['pic_path']))
@@ -86,10 +87,6 @@ def find_faces(cardmap, scale=1.35, min_neighbor=4):
         orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (len(faces), id))
     orient_db.con.commit()
     return facecount
-
-
-def list_only_faces(l1, l2, faced):
-    return [l for l in l1 if l in faced], [l for l in l2 if l in faced]
 
 
 def add_dct_data(cardpaths):
@@ -271,8 +268,6 @@ class Simile(object):
 
     def hamm_ups(self, dct, cutval):
         """
-        Parameters
-        ----------
         dct: single mpz(uint64) to be compared against all the other values
         cutval: the hamming distance threshold to filter the list with
 
