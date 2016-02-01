@@ -298,9 +298,9 @@ def main():
     #todo: subclass Simile instead of re-running getdcts()
     smiles = Simile(d, e, f)
     default_distance = 15
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-    print("- Press <c> to capture & compare to all cards - ")
+    print("- Press <c> to capture & compare & then to clear all cards - ")
     print("- Press <f> to only use cards with detected 'faces' in them -")
 
     while(True):
