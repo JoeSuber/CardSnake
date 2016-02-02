@@ -28,7 +28,7 @@ You may need to get a few other python packages.
 
 From the command line, (on windows use: winkey-x [command prompt (admin)])
 
->pip install requests grequests python-Levenshtein gmpy2 numpy
+>pip install requests grequests python-Levenshtein gmpy2 numpy path.py
 
 (installer stuff happens)
 
