@@ -303,7 +303,7 @@ def main():
     print("- Press <c> to capture & compare & then to clear all cards - ")
     print("- Press <f> to only use cards with detected 'faces' in them -")
 
-    while(True):
+    while True:
         ret, frame = cap.read()
         FACE_ONLY = False
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -318,8 +318,8 @@ def main():
             # draw a captured image showing a box around detected faces
             if len(localface):
                 img = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-                for (x,y,w,h) in localface:
-                    cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
+                for (x, y, w, h) in localface:
+                    cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
                 cv2.imshow("Faces", img)
             SEARCH = True
             ch = ''
