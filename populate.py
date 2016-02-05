@@ -12,7 +12,7 @@ after running populate.py, run picfinder.py to check magiccards.info for downloa
 """
 
 import os
-import path
+import path.py
 import json
 import sqlite3
 import requests

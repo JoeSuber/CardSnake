@@ -292,10 +292,11 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     try:
         assert(len(set(needed_local_paths)) == len(needed_local_paths))
     except AssertionError:
+        # show duplicate paths, ie one picture path assigned to multiple ids
         for p, l, i in zip(needed_local_paths, needed_links, needed_ids):
             idxs = [i for i, s in enumerate(needed_local_paths) if p == s]
             if len(idxs) > 1:
-                print("         *********")
+                print("  BAD:   picture paths assigned to multiple ids     *********")
                 for x in idxs:
                     print needed_local_paths[x], " ", needed_links[x], " ", needed_ids[x]
         exit(1)
@@ -311,7 +312,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
 
     successes = 0
 
-    # take responses and turn into files, record success in database by recording fs path
+    # take responses and turn into binary image files, record success in database by recording fs path
     for num, (lp, dbid, rsp) in enumerate(izip(needed_local_paths, needed_ids, resps)):
         if rsp.status_code == 200:
             try:
@@ -333,6 +334,9 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
 
 
 def mci_sitemap_parser(sm=__mci_sitemap__, ):
+    # mci set-codes are different than standard 3-all-caps, but often similar.
+    # the json data for a newly released set often doesn't include the mci-set-code
+    # this gets a list of all the possible mci codes.
     r = requests.get(sm)
     MAIN_LINE = False
     mci_codes = list()
