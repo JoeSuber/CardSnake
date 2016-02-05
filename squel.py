@@ -85,7 +85,7 @@ def listset(code):
         print("{}: {} {}".format(r['code'], r['name'], r['pic_link']))
 
 
-if __name__ == "__main__":
+def main():
     pprint.pprint("columns: {}".format(cols()))
     pprint.pprint(jsoninfo())
     pprint.pprint(codeinfo())
@@ -99,3 +99,8 @@ if __name__ == "__main__":
             for l in p:
                 print l
             #print r['layout'], r['name'], r['code'], r['pic_link']
+    return 1
+
+
+if __name__ == "__main__":
+    exit(main())
