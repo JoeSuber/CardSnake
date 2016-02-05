@@ -12,4 +12,4 @@ populate.main()
 picfinder.main()
 init_and_check()
 
-print("creation, updates and orientation are finished")
+print("creation, updates, and orientation are finished")
