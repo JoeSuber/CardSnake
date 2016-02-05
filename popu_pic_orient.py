@@ -11,3 +11,5 @@ from orientation import *
 populate.main()
 picfinder.main()
 init_and_check()
+
+print("updates and orientation are finished")
