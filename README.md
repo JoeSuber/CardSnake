@@ -1,6 +1,6 @@
 # CardSnake
 This will scrape and download to create a local database and file-tree of card images.
-Then it will let you play with things. The tools will evolve.
+Then it will let you play with things. These tools will evolve.
 
 To run this you will need python2.7.xx:
 
