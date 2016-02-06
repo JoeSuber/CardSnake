@@ -36,26 +36,22 @@ Now for the fun part!
 
 get your command line to where you copied/cloned all the CardSnake files and type:
 
->> python populate.py
+>> python popu_pic_orient.py
 
-(stuff happens)
+(stuff happens, data is acquired, pics downloaded for maybe 20 minutes)
 
->> python picfinder.py
-
-(stuff happens for a few minutes)
+next, type:
 
 >> python orientation.py
 
-(on the first run, it may take a while to calculate and store all the DCT data, maybe 20 minutes)
-
-(when done, a camera view pops up. press 'c' or 'f' or 'Esc' to quit) 
+A camera view pops up. press 'c' (capture) or 'f' (faces only) or 'Esc' (to quit) 
 
 Make funny faces into your web cam, or show it the art on a card. It will show you what is most similar.
 
-Update / check for new data by re-running the above stuff in order. 
-It only updates what needs updating so it will be much faster.
+Update / check for new data by re-running 'popu_pic_orient.py'. 
+It only updates what needs updating so it will be much faster now.
 
-Notice that you now have a /CardSnake/pics/ sub-directory full of all the up to date card images (.jpg format). 
+Notice that you now have a local /CardSnake/pics/ sub-directory full of all the up to date card images (.jpg format). 
 29,500+ of them as of this date.
 
 Have fun!

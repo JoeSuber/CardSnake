@@ -38,6 +38,7 @@ __mci_parser__ = '<td><a href="/{}/en/'
 __mci_sitemap__ = 'http://magiccards.info/sitemap.html'
 
 # json data has some strangeness in it:
+# oddities will need to be matched to pics on different pages than 'normal' cards
 # oddities are included in some card sets along with normal cards. key=='layout'...
 oddities = ["phenomenon", "plane", "token", "scheme", "vanguard"]
 # these sets include duplicate numbers, so matching by name only is required:
@@ -50,7 +51,7 @@ def setcodeinfo():
     """
     returns {'official' set code: magicCardsInfo code, 'ISD': 'isd', ...}
     """
-    return {k: v for k, v in peep.set_db.cur.execute("select code, magicCardsInfoCode from {}"
+    return {k: v for k, v in peep.set_db.cur.execute("SELECT code, magicCardsInfoCode FROM {}"
                                                      .format(peep.__sets_t__, )).fetchall()}
 
 
@@ -117,6 +118,9 @@ def num_from_urls(urls, num, layout):
 
 
 def populate_links(setcodes):
+    """
+    setcodes = {three-character-all-caps-json-given-set-code: magiccards.info set-code, ...}
+    """
     sql = '''SELECT id, name, imageName, number, layout, code from {} where code=?'''.format(peep.__cards_t__)
     usql = '''UPDATE {} SET pic_link=? WHERE id=?'''.format(peep.__cards_t__)
     oddballs = defaultdict(list)
@@ -169,15 +173,18 @@ def populate_links(setcodes):
         # try matching to href links by exact card-names in database
         revlinks = defaultdict(list)
         for k, v in links.viewitems():
-            revlinks[v].append(k)
+            revlinks[v.encode('utf-8')].append(k)
         for name_col in ['name']:       # used to match against 'imageName' as well. might go back to that.
             for x in xrange(len(work)):
                 w = work.pop()
                 try:
-                    peep.card_db.cur.execute(usql, (revlinks[w[name_col]].pop(), w['id']))
+                    peep.card_db.cur.execute(usql, (revlinks[w[name_col].encode('utf-8')].pop(), w['id']))
+                    continue
                 except IndexError or KeyError as e:
-                    #print(u"no exact match from {} column for {} ".format(name_col, w[name_col]))
-                    work.appendleft(w)
+                    # error when list of links is empty or card-name is not in the keys
+                    print(u"no exact match from {} column for {} ".format(name_col, w[name_col]))
+                    pass
+                work.appendleft(w)
 
         msg = u"started: {}   by numbers down to: {}   by exact names: {}  " \
               u"for set='{}' aka http://magiccards.info/{}/en.html \n"\
@@ -198,13 +205,10 @@ def populate_links(setcodes):
             scored = []
             for name, link in revlinks.viewitems():
                 try:
-                    scored.append((name, leven.distance(w['name'].encode('utf-8'),
-                                                        name.encode('utf-8'))))
+                    scored.append((name, leven.distance(w['name'].encode('utf-8'), name)))
                 except UnicodeDecodeError as e:
-                    print(u"{} :  -{}-  vs -{}-".format(e, w['name'].encode('utf-8', errors='replace'),
-                                                        name.encode('utf-8', errors='replace')))
-                    scored.append((name, leven.distance(w['name'].encode('utf-8', errors='replace'),
-                                                        name.encode('utf-8', errors='replace'))))
+                    print(u"{} :  -{}-  vs -{}-".format(e, w['name'].encode('utf-8', errors='replace'), name))
+                    scored.append((name, leven.distance(w['name'].encode('utf-8', errors='replace'), name)))
             if not scored:
                 work.appendleft(w)
                 continue
@@ -234,7 +238,7 @@ def populate_links(setcodes):
         json.dump(oddballs, odd)
 
         #todo: use magiccards.info 'extras' page to do more final matching
-        #http://magiccards.info/extras.html
+        # http://magiccards.info/extras.html
 
     peep.card_db.con.commit()
 
@@ -250,26 +254,22 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     usql = '''UPDATE {} SET pic_path=? WHERE id=?'''.format(peep.__cards_t__)
     work = db.cur.execute(sql).fetchall()
     real_work = []
-    # needs_link = defaultdict(list)
     needed_ids, needed_local_paths, needed_links = [], [], []
-    # already_here = defaultdict(list)
     new_dirs = Counter()
 
     # first filter out some causes of errors
     for w in work:
-        # are we supposed to skip it?
+        # are we supposed to skip it (bad link already tried, etc)?
         if w['id'] in skip:
             continue
         # is there a link?
         if not w['pic_link']:
             # print ("NO PIC LINK: {} of {}".format(w['name'], w['code']))
-            # needs_link[w['code']].append(w['id'])
             continue
         # is the required file present and not empty?
         if w['pic_path']:
             prospect = os.path.join(fs_stub, w['pic_path'])
             if os.path.isfile(prospect) and os.stat(prospect).st_size > 10:
-                # already_here[w['code']].append(prospect)
                 continue
         # if none of above, add to real_work
         real_work.append(w)
