@@ -46,7 +46,7 @@ next, type:
 
 A camera view pops up. press 'c' (capture) or 'f' (faces only) or 'Esc' (to quit) 
 
-Make funny faces into your web cam, or show it the art on a card. It will show you what is most similar.
+Make funny faces into your web cam, or show it the art on a card. What is most similar?
 
 Update / check for new data by re-running 'popu_pic_orient.py'. 
 It only updates what needs updating so it will be much faster now.
