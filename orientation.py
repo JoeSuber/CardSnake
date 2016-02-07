@@ -278,10 +278,23 @@ class Simile(object):
         return self.ids[np.where(self.gmp_hamm(self.ups,  dct) < cutval)]
 
 
+def mirrorcards():
+    cardlist = peep.card_db.cur.execute("SELECT id FROM cards").fetchall()
+    dctstuff = [d['id'] for d in orient_db.cur.execute("SELECT id FROM orient").fetchall()]
+    missing = [c['id'] for c in cardlist if not (c['id'] in dctstuff)]
+    orient_db.cur.executemany("INSERT INTO orient (?)", missing)
+    orient_db.con.commit()
+    print("{} id are added to orient_db".format(len(missing)))
+    if missing:
+        print("{}".format(missing[0]))
+    return 1
+
+
 def init_and_check():
     """
     call this along with populate.py and picfinder.py to fill up database when running on remote server
     """
+    mirrorcards()
     add_dct_data(cards())
     for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
