@@ -164,7 +164,7 @@ def asynch_getter(unsent, groupsize_limit=None, DBG=DEBUG):
     """
     Parameters
     ----------
-    unsent: prepared requests objects that are not yet responses
+    unsent: generator-prepared requests objects that are not yet responses
     groupsize_limit: can keep us from spamming web server. 12-at-a-time works
 
     Returns
