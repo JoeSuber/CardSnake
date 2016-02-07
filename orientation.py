@@ -282,6 +282,7 @@ def mirrorcards():
     cardlist = peep.card_db.cur.execute("SELECT id FROM cards").fetchall()
     dctstuff = [d['id'] for d in orient_db.cur.execute("SELECT id FROM orient").fetchall()]
     missing = [c['id'] for c in cardlist if not (c['id'] in dctstuff)]
+    print missing
     orient_db.cur.executemany("INSERT INTO orient (id) VALUES (?)", missing)
     orient_db.con.commit()
     print("{} id are added to orient_db".format(len(missing)))
