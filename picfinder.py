@@ -73,38 +73,69 @@ def setlist_links(mci_setcode):
     return dict([linkup(i) for i in ri if __mci_parser__.format(mci_setcode) in i])
 
 
-def card_counts(counter_col, tackon=None):
-    """
-    return {set-code: mci-code, ...} for all set-codes missing local images or that
-    have a new number of items since cards_counts last checked the database.
-    """
-    current_counts, needs_links = {}, {}
-    if tackon is None:
-        tackon = {}
-    # print ("tackon dict: {}".format(tackon))
+def mci_sitemap_parser(sm=__mci_sitemap__, ):
+    # mci set-codes are different than standard 3-all-caps, but often similar.
+    # the json data for a newly released set often doesn't include the mci-set-code
+    # this gets a list of all the possible mci codes.
+    r = requests.get(sm)
+    MAIN_LINE = False
+    mci_codes = list()
+    if r.status_code != 200:
+        print("status code: {} ...No sitemap page from: {}".format(r.status_code, sm))
+        return []
+    for kk in r.iter_lines():
+        if MAIN_LINE:
+            for s in kk.split('<small style="color: #aaa;">'):
+                mci_codes.append(s.split('</small></li><')[0])
+            return mci_codes[1:]
 
-    old_counts = dict(peep.set_db.cur.execute("select {},{} from {}".format(u'code', counter_col,
-                                                                            peep.__sets_t__)).fetchall())
+        if '<small style="color: #aaa;">en</small></h2>' in kk:
+            MAIN_LINE = True
+    return []
 
-    for kkk, mci in setcodeinfo().viewitems():
-        if (mci is None) and (kkk in tackon.keys()):
-            mci = tackon[kkk]
-            peep.set_db.cur.execute("UPDATE set_infos SET magicCardsInfoCode=? WHERE code=?", (mci, kkk))
-        allhits = peep.card_db.cur.execute("select code, pic_path from {} WHERE code=?"
-                                           .format(peep.__cards_t__), (kkk,)).fetchall()
-        setname = peep.set_db.cur.execute("select name from set_infos where code=?", (kkk,)).fetchone()
+
+def card_counts(counter_col):
+    """
+    return {set-code: mci-code, ...} for sets with any cards missing a local image path
+    """
+    # add some straggler mci codes if possible
+    mci_codes_from_sitemap = mci_sitemap_parser()
+    for code, mci in setcodeinfo().viewitems():
         if mci is None:
-            print("{} aka {}: has no magicCardsInfoCode.".format(setname['name'], kkk))
-        hits = [code for code, path in allhits if path and os.path.isfile(os.path.join(peep.__mtgpics__, path))]
-        current_counts[kkk] = len(hits)
-        if (len(hits) != len(allhits)) or (old_counts[kkk] != current_counts[kkk]):
-            peep.set_db.cur.execute("UPDATE {} SET {}=({}) WHERE {}='{}'".format(peep.__sets_t__,
-                                                                             counter_col,
-                                                                             current_counts[kkk],
-                                                                             u'code', kkk))
-            needs_links.update({kkk: mci})
+            if code.lower() in mci_codes_from_sitemap:
+                print("Using magiccards.info sitemap to add '{}' to setcodes".format(code.lower()))
+                peep.set_db.cur.execute("UPDATE {} SET magicCardsInfoCode=(?) WHERE code=(?)"
+                                        .format(peep.__sets_t__), (code.lower(), code))
     peep.set_db.con.commit()
+
+    # just check them all (in a set) if any are missing? seems ok
+    needs_links = {}
+    for kkk, mci in setcodeinfo().viewitems():
+        if mci:
+            allhits = peep.card_db.cur.execute("select code, pic_path from {} WHERE code=?"
+                                               .format(peep.__cards_t__), (kkk,)).fetchall()
+            for a in allhits:
+                if not a['pic_path']:
+                    needs_links.update({kkk: mci})
+                    break
+                else:
+                    if not os.path.isfile(a['pic_path']):
+                        needs_links.update({kkk: mci})
+                        break
     return needs_links
+
+
+def cards(fs=peep.__mtgpics__):
+    # joins unique part of path to local path-stub or sends a None if path is None.
+    cardmap = {}
+    for line in peep.card_db.cur.execute("SELECT id, name, code, pic_path from cards").fetchall():
+        #print("fs={}   picpath={}".format(fs, line['pic_path']))
+        if line['pic_path']:
+            cardmap[line['id']] = os.path.join(fs, line['pic_path'])
+        else:
+            cardmap[line['id']] = None
+    return cardmap
+
 
 
 def num_from_urls(urls, num, layout):
@@ -131,6 +162,8 @@ def populate_links(setcodes):
         if mci is None:
             print("ATTENTION: {} has no magiccards.info code, and will get no pics from there!".format(s))
             continue
+
+        # each chunk of work is determined by the official setcode, but won't go without mci codes
         work = deque(peep.card_db.cur.execute(sql, (s,)).fetchall())
 
         for x in xrange(len(work)):
@@ -345,27 +378,6 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     return skip, quant_left - successes
 
 
-def mci_sitemap_parser(sm=__mci_sitemap__, ):
-    # mci set-codes are different than standard 3-all-caps, but often similar.
-    # the json data for a newly released set often doesn't include the mci-set-code
-    # this gets a list of all the possible mci codes.
-    r = requests.get(sm)
-    MAIN_LINE = False
-    mci_codes = list()
-    if r.status_code != 200:
-        print("status code: {} ...No sitemap page from: {}".format(r.status_code, sm))
-        return []
-    for kk in r.iter_lines():
-        if MAIN_LINE:
-            for s in kk.split('<small style="color: #aaa;">'):
-                mci_codes.append(s.split('</small></li><')[0])
-            return mci_codes[1:]
-
-        if '<small style="color: #aaa;">en</small></h2>' in kk:
-            MAIN_LINE = True
-    return []
-
-
 def main():
     peep.card_db.add_columns(peep.__cards_t__, __db_pic_col__)
     peep.card_db.add_columns(peep.__cards_t__, __db_link__)
@@ -377,14 +389,7 @@ def main():
     #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
     #peep.card_db.con.commit()
     # # # # # # #
-    mci_codes_from_sitemap = mci_sitemap_parser()
-    for code, mci in setcodeinfo().viewitems():
-        if mci is None:
-            if code.lower() in mci_codes_from_sitemap:
-                print("Using magiccards.info sitemap to add '{}' to setcodes".format(code.lower()))
-                peep.set_db.cur.execute("UPDATE {} SET magicCardsInfoCode=(?) WHERE code=(?)"
-                                        .format(peep.__sets_t__), (code.lower(), code))
-    peep.set_db.con.commit()
+
     populate_links(card_counts(__db_card_count__.keys()[0]))
     trying = 100
     remains = len(it)

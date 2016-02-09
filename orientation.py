@@ -40,12 +40,14 @@ def dct_hint(im, hsize=32):
 
 
 def cards(fs=peep.__mtgpics__):
-    # joins unique part of path to local stub.
+    # joins unique part of path to local path-stub or sends a None if path is None.
     cardmap = {}
     for line in peep.card_db.cur.execute("SELECT id, name, code, pic_path from cards").fetchall():
         #print("fs={}   picpath={}".format(fs, line['pic_path']))
         if line['pic_path']:
             cardmap[line['id']] = os.path.join(fs, line['pic_path'])
+        else:
+            cardmap[line['id']] = None
     return cardmap
 
 
@@ -55,10 +57,11 @@ def needed_faces(cardmap, examine_zeros=False):
     defaults to only examining 'null' valued, new items, not zeroes.
     """
     needed = {}
-    for id in cardmap.viewkeys():
-        card_has_face = orient_db.cur.execute("SELECT face FROM orient WHERE id=?", (id,)).fetchone()[0]
-        if card_has_face is None or (examine_zeros and not card_has_face):
-            needed[id] = cardmap[id]
+    for id, cardpath in cardmap.viewitems():
+        if os.path.isfile(cardpath):
+            card_has_face = orient_db.cur.execute("SELECT face FROM orient WHERE id=?", (id,)).fetchone()[0]
+            if card_has_face is None or (examine_zeros and not card_has_face):
+                needed[id] = cardmap[id]
     return needed
 
 
@@ -91,23 +94,27 @@ def find_faces(cardmap, scale=1.35, min_neighbor=4):
 
 def add_dct_data(cardpaths):
     """
-    sock away top and bottom dcts of pics as persistent 64-bit int
+    sock away top and bottom dcts of pics as a persistent 64-bit int
+    cardpaths = {card['id']: card['pic_path'], card['id']: None, ...}
+    cardpaths should be drawn from card_db where they are already vetted
     """
     datas = []
-    allin = orient_db.cur.execute("SELECT * from orient").fetchall()
-    qneed = [a['picpath'] is None for a in allin].count(True)
-    print("dct-database is missing data for {} of {} possible rows.".format(qneed, len(cardpaths)))
-    if qneed:
-        for k, v in cardpaths.viewitems():
-            shortpath = os.path.sep.join(v.split(os.path.sep)[-2:])
-            if all([a['picpath'] != shortpath for a in allin]):
-                #print("+ {}".format(shortpath))
-                im = cv2.equalizeHist(cv2.imread(v, cv2.IMREAD_GRAYSCALE))
-                height, width = im.shape[:2]
-                line = {'id': k, 'picpath': shortpath, 'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
-                        'bot_dct': gmpy2.digits(dct_hint(im[height-width*__RAT__:height, :width]))}
-                datas.append(line)
-    print("adding {} new lines of data to a previous {} lines".format(len(datas), len(allin)))
+    counter = 0
+    print("Calculating DCT data...")
+    for idc, fsp in cardpaths.viewitems():
+        current_card = orient_db.cur.execute("SELECT id, top_dct, picpath FROM orient WHERE id=(?)", (idc,)).fetchone()
+        # current_card['picpath'] will also be the marker of a processed card in orient
+        if fsp and not current_card['picpath']:
+            counter += 1
+            if not (counter % 100):
+                print("{} new pics dct'd".format(counter))
+            shortpath = os.path.sep.join(fsp.split(os.path.sep)[-2:])
+            im = cv2.equalizeHist(cv2.imread(fsp, cv2.IMREAD_GRAYSCALE))
+            height, width = im.shape[:2]
+            datas.append({'id': idc, 'picpath': shortpath, 'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
+                          'bot_dct': gmpy2.digits(dct_hint(im[height-width*__RAT__:height, :width]))})
+    print("{} new pics dct'd".format(counter))
+    print("adding {} new lines of data to orient from {} card-paths".format(len(datas), len(cardpaths)))
     if datas:
         orient_db.add_data(datas, 'orient', 'id')
         print("committed!")
