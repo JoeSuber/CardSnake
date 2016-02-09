@@ -18,6 +18,7 @@ import sqlite3
 import requests
 import grequests
 from collections import Counter
+from itertools import izip, repeat
 import time
 
 
@@ -132,16 +133,26 @@ class DBMagic (object):
                         print("guessing primary key is: {}".format(key_column))
 
         approved_columns = self.show_columns(tbl)
+
+        def hunk(c):
+            a, b = c
+            return a + "=(" + b + ")"
+
         for n, line in enumerate(data):
             line_item = {k: v for k, v in line.viewitems() if k in approved_columns}
-            SQL = '''INSERT OR REPLACE INTO {}({}) VALUES({})'''.format(str(tbl), ', '.join(line_item.keys()),
-                                                                        ':' + ', :'.join(line_item.keys()))
+            SQL1 = '''INSERT OR IGNORE INTO {}({}) VALUES({}); '''.format(str(tbl), ', '.join(line_item.keys()),
+                                                                          ':' + ', :'.join(line_item.keys()))
+            SQL2 = '''UPDATE {} SET {} WHERE changes()=0 and {}=('{}'); '''\
+                .format(str(tbl), ", ".join(map(hunk, izip(line_item.keys(), repeat('?')))),
+                        key_column, line_item[key_column])
             try:
-                self.cur.execute(SQL, line_item)
+                self.cur.execute(SQL1, line_item)
+                self.cur.execute(SQL2, line_item.values())
             except (sqlite3.OperationalError, sqlite3.InterfaceError) as e:
                 error_count += 1
-                print("error: {} ***********  {}   len={}  >>> {}    *******".format(error_count, n, len(line_item), e))
-                print(SQL)
+                print("error: {} *****table: {} ***  row#{}   #items={}  >>> {}  ***"
+                      .format(error_count, tbl, n, len(line_item), e))
+                print(SQL1, SQL2)
                 print(line_item)
                 if error_count > __max_errors__:
                     print("** data entry has too many problems to ignore. exiting, harshly **")

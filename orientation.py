@@ -42,12 +42,10 @@ def dct_hint(im, hsize=32):
 def cards(fs=peep.__mtgpics__):
     # joins unique part of path to local path-stub or sends a None if path is None.
     cardmap = {}
-    for line in peep.card_db.cur.execute("SELECT id, name, code, pic_path from cards").fetchall():
+    for line in orient_db.cur.execute("SELECT id, picpath from orient").fetchall():
         #print("fs={}   picpath={}".format(fs, line['pic_path']))
-        if line['pic_path']:
-            cardmap[line['id']] = os.path.join(fs, line['pic_path'])
-        else:
-            cardmap[line['id']] = None
+        if line['picpath']:
+            cardmap[line['id']] = os.path.join(fs, line['picpath'])
     return cardmap
 
 
@@ -65,7 +63,7 @@ def needed_faces(cardmap, examine_zeros=False):
     return needed
 
 
-def find_faces(cardmap, scale=1.35, min_neighbor=4):
+def find_faces(cardmap, scale=1.25, min_neighbor=4):
     """
     Parameters
     ----------
@@ -78,6 +76,7 @@ def find_faces(cardmap, scale=1.35, min_neighbor=4):
     """
     facecount = Counter()
     if not cardmap:
+        print("All face detection was done previously")
         return facecount
     print("face finder will examine {} pictures, using scale={} minNeighbors={}"
           .format(len(cardmap), scale, min_neighbor))
@@ -85,7 +84,8 @@ def find_faces(cardmap, scale=1.35, min_neighbor=4):
     for n, (id, cardpath) in enumerate(cardmap.viewitems()):
         faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)),
                                               scaleFactor=scale, minNeighbors=min_neighbor)
-        print("{}: {} -- {}".format(n, len(faces), faces))
+        if len(faces):
+            print("{}: {}: has {} faces".format(n, cardpath, len(faces)))
         facecount[len(faces)] += 1
         orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (len(faces), id))
     orient_db.con.commit()
@@ -100,24 +100,35 @@ def add_dct_data(cardpaths):
     """
     datas = []
     counter = 0
+    q = orient_db.cur.execute("SELECT * FROM orient").fetchall()
+    for p in q:
+        if p['top_dct']:
+            print "start: ", p
     print("Calculating DCT data...")
     for idc, fsp in cardpaths.viewitems():
-        current_card = orient_db.cur.execute("SELECT id, top_dct, picpath FROM orient WHERE id=(?)", (idc,)).fetchone()
-        # current_card['picpath'] will also be the marker of a processed card in orient
-        if fsp and not current_card['picpath']:
+        #id, top_dct, picpath, face
+        current_card = orient_db.cur.execute("SELECT * FROM orient WHERE id=(?)", (idc,)).fetchone()
+        # print fsp, current_card
+        if fsp and not current_card['top_dct']:
             counter += 1
-            if not (counter % 100):
+            if not (counter % 200):
                 print("{} new pics dct'd".format(counter))
             shortpath = os.path.sep.join(fsp.split(os.path.sep)[-2:])
             im = cv2.equalizeHist(cv2.imread(fsp, cv2.IMREAD_GRAYSCALE))
             height, width = im.shape[:2]
-            datas.append({'id': idc, 'picpath': shortpath, 'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
-                          'bot_dct': gmpy2.digits(dct_hint(im[height-width*__RAT__:height, :width]))})
+            datas.append({'id': idc, 'face': current_card['face'], 'picpath': shortpath,
+                          'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
+                          'bot_dct': gmpy2.digits(dct_hint(im[height - width*__RAT__:height, :width]))})
     print("{} new pics dct'd".format(counter))
     print("adding {} new lines of data to orient from {} card-paths".format(len(datas), len(cardpaths)))
     if datas:
         orient_db.add_data(datas, 'orient', 'id')
         print("committed!")
+
+    q = orient_db.cur.execute("SELECT * FROM orient").fetchall()
+    for p in q:
+        if not p['top_dct']:
+            print "end", p
     return datas
 
 
@@ -290,16 +301,16 @@ def mirror_cards():
     see which items in card db need to be added to orient, then add them.
     then remove null paths that may have crept into orient_db
     """
-    cardlist = (c['id'] for c in peep.card_db.cur.execute("SELECT id, pic_path FROM cards").fetchall())
-    dctstuff = [d['id'] for d in orient_db.cur.execute("SELECT id FROM orient").fetchall()]
-    missing = ((c,) for c in cardlist if not (c in dctstuff))
-    orient_db.cur.executemany("INSERT INTO orient (id) VALUES (?)", missing)
-    orient_db.con.commit()
-    lll = orient_db.cur.execute("SELECT id, picpath FROM orient").fetchall() #
+    cardlist = peep.card_db.cur.execute("SELECT id, pic_path FROM cards").fetchall()
+    mirroring = ({'id': c['id'], 'picpath': c['pic_path']} for c in cardlist if c['pic_path'])
+    orient_db.add_data(mirroring, 'orient', key_column='id')
+    lll = orient_db.cur.execute("SELECT id, top_dct, picpath FROM orient").fetchall()
     for n, l in enumerate(lll):
         if not l['picpath']:
-            print n, l['id'], l['picpath']
+            print "Delete from orient:", n, l['id'], l['picpath']
             orient_db.cur.execute("DELETE FROM orient WHERE id=?", (l['id'],))
+        if not l['top_dct']:
+            print "mirr", n, l
     orient_db.con.commit()
     return 1
 

@@ -215,7 +215,7 @@ def populate_links(setcodes):
             fob.write(msg)
 
         # clear out empty entries
-        for k, l in revlinks.viewitems():
+        for k, l in revlinks.items():
             if not l:
                 revlinks.pop(k)
 
