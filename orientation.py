@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from collections import defaultdict, Counter, deque
 
-__RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image-bottom-border at art-line
+__RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image's-bottom-border at art-line
 
 #peep.card_db.cur.execute("DROP TABLE orient")
 
