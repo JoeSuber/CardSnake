@@ -101,9 +101,6 @@ def add_dct_data(cardpaths):
     datas = []
     counter = 0
     q = orient_db.cur.execute("SELECT * FROM orient").fetchall()
-    for p in q:
-        if p['top_dct']:
-            print "start: ", p
     print("Calculating DCT data...")
     for idc, fsp in cardpaths.viewitems():
         #id, top_dct, picpath, face
@@ -351,14 +348,22 @@ def main():
             FACE_ONLY = True
             ch = ord('c')
         if ch == ord('c'):
-            dct = dct_hint(gray)
+            cv2.destroyAllWindows()
             localface = face_cascade.detectMultiScale(cv2.equalizeHist(gray), scaleFactor=1.2, minNeighbors=3)
-            # draw a captured image showing a box around detected faces
+
             if len(localface):
-                img = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+                xf, yf, wf, hf = 0, 0, 0, 0
                 for (x, y, w, h) in localface:
-                    cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
-                cv2.imshow("Faces", img)
+                    #cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+                    xf, yf = max(xf, x-20), max(yf, y-30)
+                    wf, hf = min(xf + w + 40, gray.shape[1]), min(yf + h + 60, gray.shape[0])
+                img = gray[yf:hf, xf:wf]
+                print xf, yf, wf, hf
+                cv2.imshow("Face only", img)
+                dct = dct_hint(img)
+            else:
+                cv2.imshow("frame", gray)
+                dct = dct_hint(gray)
             SEARCH = True
             ch = ''
 
@@ -367,12 +372,10 @@ def main():
                     # pull from only the database items that have detected faces <f>
                     list1 = smiles.hamm_ups(dct, default_distance)
                     list2 = smiles.hamm_ups(dct, default_distance - 1)
-                    print("faces only")
                 else:
                     # pull from all database items <c>
                     list1 = simulate.hamm_ups(dct, default_distance)
                     list2 = simulate.hamm_ups(dct, default_distance - 1)
-                    print("everything")
                 if len(list1) < 1:
                     default_distance += 2
                     continue
