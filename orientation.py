@@ -122,10 +122,8 @@ def add_dct_data(cardpaths):
         orient_db.add_data(datas, 'orient', 'id')
         print("committed!")
 
-    q = orient_db.cur.execute("SELECT * FROM orient").fetchall()
-    for p in q:
-        if not p['top_dct']:
-            print "end", p
+    q = orient_db.cur.execute("SELECT id FROM orient").fetchall()
+    print("there are now {} lines in orient".format(len(q)))
     return datas
 
 
@@ -354,7 +352,6 @@ def main():
             if len(localface):
                 xf, yf, wf, hf = 0, 0, 0, 0
                 for (x, y, w, h) in localface:
-                    #cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
                     xf, yf = max(xf, x-20), max(yf, y-30)
                     wf, hf = min(xf + w + 40, gray.shape[1]), min(yf + h + 60, gray.shape[0])
                 img = gray[yf:hf, xf:wf]

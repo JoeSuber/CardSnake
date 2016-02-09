@@ -120,8 +120,8 @@ class DBMagic (object):
 
         Returns
         -------
-        side effect = database entry.  Note this isn't an UPSERT, but similar because we only
-        replace the cells in the given columns. sqlite3 has no native UPSERT command.
+        side effect = database entry. Made an UPSERT from strings that accepts any number of key: vals
+        as long as keys are column names. keys can also make columns. sqlite3 has no native UPSERT command.
         """
         n, error_count = -1, 0
         if key_column is None:
