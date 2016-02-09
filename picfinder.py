@@ -96,7 +96,7 @@ def mci_sitemap_parser(sm=__mci_sitemap__, ):
 
 def card_counts(counter_col):
     """
-    return {set-code: mci-code, ...} for sets with any cards missing a local image path
+    return {set-code: mci-code, ...} for sets containing any cards missing a valid local image path
     """
     # add some straggler mci codes if possible
     mci_codes_from_sitemap = mci_sitemap_parser()
@@ -123,19 +123,6 @@ def card_counts(counter_col):
                         needs_links.update({kkk: mci})
                         break
     return needs_links
-
-
-def cards(fs=peep.__mtgpics__):
-    # joins unique part of path to local path-stub or sends a None if path is None.
-    cardmap = {}
-    for line in peep.card_db.cur.execute("SELECT id, name, code, pic_path from cards").fetchall():
-        #print("fs={}   picpath={}".format(fs, line['pic_path']))
-        if line['pic_path']:
-            cardmap[line['id']] = os.path.join(fs, line['pic_path'])
-        else:
-            cardmap[line['id']] = None
-    return cardmap
-
 
 
 def num_from_urls(urls, num, layout):
@@ -258,7 +245,6 @@ def populate_links(setcodes):
                 work.appendleft(w)
             if msg:
                 print(msg)
-
 
         # looks like the end of the line. Record remaining work.
         if work:
