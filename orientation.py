@@ -158,7 +158,7 @@ def getdcts(only_faces=False):
                 downs.appendleft(d)
                 ids.appendleft(i)
         ups, downs, ids = list(ups), list(downs), list(ids)
-    return ups, downs, [i['id'] for i in dcts]
+    return ups, downs, ids
 
 
 def npydcts():
