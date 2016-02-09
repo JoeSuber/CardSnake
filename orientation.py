@@ -278,7 +278,7 @@ class Simile(object):
         return self.ids[np.where(self.gmp_hamm(self.ups,  dct) < cutval)]
 
 
-def mirrorcards():
+def mirror_cards():
     """
     see which items in card db need to be added to orient, then add them.
     then remove null paths that may have crept into orient_db
@@ -301,7 +301,7 @@ def init_and_check():
     """
     call this along with populate.py and picfinder.py to fill up database when running on remote server
     """
-    mirrorcards()
+    mirror_cards()
     add_dct_data(cards())
     for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
