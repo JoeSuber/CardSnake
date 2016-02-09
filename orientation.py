@@ -85,7 +85,7 @@ def find_faces(cardmap, scale=1.25, min_neighbor=4):
         faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)),
                                               scaleFactor=scale, minNeighbors=min_neighbor)
         if len(faces):
-            print("{}: {}: has {} faces".format(n, cardpath, len(faces)))
+            print("{}: {}: has {} face{}".format(n, cardpath, len(faces), 's' if len(faces) > 1 else ''))
         facecount[len(faces)] += 1
         orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (len(faces), id))
     orient_db.con.commit()
@@ -304,8 +304,6 @@ def mirror_cards():
         if not l['picpath']:
             print "Delete from orient:", n, l['id'], l['picpath']
             orient_db.cur.execute("DELETE FROM orient WHERE id=?", (l['id'],))
-        if not l['top_dct']:
-            print "mirr", n, l
     orient_db.con.commit()
     return 1
 
