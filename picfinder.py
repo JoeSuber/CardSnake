@@ -150,7 +150,7 @@ def populate_links(setcodes):
             with open("local_mias", 'a+') as fob:
                 fob.write(msg)
 
-        # try to match by card number in url
+        # try to match by card number in url, and local, .json-given 'number'
         for x in xrange(len(work)):
             w = work.pop()
             if w['code'] in numberskip:
@@ -180,10 +180,12 @@ def populate_links(setcodes):
                 try:
                     peep.card_db.cur.execute(usql, (revlinks[w[name_col].encode('utf-8')].pop(), w['id']))
                     continue
-                except IndexError or KeyError as e:
-                    # error when list of links is empty or card-name is not in the keys
-                    print(u"no exact match from {} column for {} ".format(name_col, w[name_col]))
-                    pass
+                except IndexError:
+                    print(u"Already used the last picture link for '{}'".format(w[name_col]))
+                    # remove the key since it has no links remaining
+                    revlinks.pop(w[name_col].encode('utf-8'))
+                except KeyError:
+                    print(u"{}: No Key-name for: '{}'".format(x, w[name_col].encode('utf-8')))
                 work.appendleft(w)
 
         msg = u"started: {}   by numbers down to: {}   by exact names: {}  " \
@@ -193,17 +195,18 @@ def populate_links(setcodes):
             fob.write(msg)
 
         # clear out empty entries
-        for k, l in revlinks.items():
+        for k, l in revlinks.viewitems():
             if not l:
                 revlinks.pop(k)
 
         # what remains of work doesn't match anything exactly.
         # now use Levenshtein distance against names.
-
+        leven_msgs = []
         for x in xrange(len(work)):
             w = work.pop()
             scored = []
-            for name, link in revlinks.viewitems():
+            msg = ""
+            for name in revlinks.viewkeys():
                 try:
                     scored.append((name, leven.distance(w['name'].encode('utf-8'), name)))
                 except UnicodeDecodeError as e:
@@ -215,11 +218,14 @@ def populate_links(setcodes):
             winner, points = sorted(scored, key=itemgetter(1))[0]
             if (points < 5) and revlinks[winner]:
                 winning_link = revlinks[winner].pop()
-                print(u"{}  - close enough match: (mtginfo)'{}'  ==  '{}'(local) SCORE: {}"
-                      .format(winning_link, winner, w['name'], points))
+                msg = u"{}  - close enough match: (mtginfo)'{}'  ==  '{}'(local) SCORE: {}"\
+                    .format(winning_link, winner, w['name'], points)
                 peep.card_db.cur.execute(usql, (winning_link, w['id']))
             else:
                 work.appendleft(w)
+            if msg:
+                print(msg)
+
 
         # looks like the end of the line. Record remaining work.
         if work:
@@ -254,7 +260,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     usql = '''UPDATE {} SET pic_path=? WHERE id=?'''.format(peep.__cards_t__)
     work = db.cur.execute(sql).fetchall()
     real_work = []
-    needed_ids, needed_local_paths, needed_links = [], [], []
+    needed_ids, needed_local_paths, needed_links, file_exists = [], [], [], []
     new_dirs = Counter()
 
     # first filter out some causes of errors
@@ -282,8 +288,13 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
         if (w['code'] == 'CON') and ('nt' in os.name):
             tag = 'win'
         # preserve unique origination information in the filename:
-        q = w['pic_link'].split("/")
-        needed_local_paths.append(os.path.join(fs_stub, w['code'] + tag, "".join(q[-2:])))
+        q = os.path.join(fs_stub, w['code'] + tag, "".join(w['pic_link'].split("/")[-2:]))
+        # in case the database held path was deleted, but localpic file is still here...
+        if os.path.isfile(q) and os.stat(q).st_size > 10:
+            file_exists.append(True)
+        else:
+            file_exists.append(False)
+        needed_local_paths.append(q)
         needed_ids.append(w['id'])
         needed_links.append(w['pic_link'])
         new_dirs[os.path.join(fs_stub, w['code'] + tag)] += 1
@@ -313,12 +324,13 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     successes = 0
 
     # take responses and turn into binary image files, record success in database by recording fs path
-    for num, (lp, dbid, rsp) in enumerate(izip(needed_local_paths, needed_ids, resps)):
+    for num, (lp, dbid, rsp, here) in enumerate(izip(needed_local_paths, needed_ids, resps, file_exists)):
         if rsp.status_code == 200:
             try:
-                with open(lp, 'wb') as fob:
-                    for chunk in rsp.iter_content(1024):
-                        fob.write(chunk)
+                if not here:
+                    with open(lp, 'wb') as fob:
+                        for chunk in rsp.iter_content(1024):
+                            fob.write(chunk)
                 a, b = lp.split(os.path.sep)[-2:]
                 db.cur.execute(usql, (os.path.join(a, b), dbid))
                 successes += 1
