@@ -279,21 +279,27 @@ class Simile(object):
 
 
 def mirrorcards():
-    cardlist = peep.card_db.cur.execute("SELECT id FROM cards").fetchall()
+    """
+    see which items in card db need to be added to orient, then add them.
+    then remove null paths that may have crept into orient_db
+    """
+    cardlist = (c['id'] for c in peep.card_db.cur.execute("SELECT id, pic_path FROM cards").fetchall())
     dctstuff = [d['id'] for d in orient_db.cur.execute("SELECT id FROM orient").fetchall()]
-    missing = [c['id'] for c in cardlist if not (c['id'] in dctstuff)]
-    print missing
+    missing = ((c,) for c in cardlist if not (c in dctstuff))
     orient_db.cur.executemany("INSERT INTO orient (id) VALUES (?)", missing)
     orient_db.con.commit()
-    print("{} id are added to orient_db".format(len(missing)))
-    if missing:
-        print("{}".format(missing[0]))
+    lll = orient_db.cur.execute("SELECT id, picpath FROM orient").fetchall() #
+    for n, l in enumerate(lll):
+        if not l['picpath']:
+            print n, l['id'], l['picpath']
+            orient_db.cur.execute("DELETE FROM orient WHERE id=?", (l['id'],))
+    orient_db.con.commit()
     return 1
 
 
 def init_and_check():
     """
-    call this along with populate.py and picfinder.py to fill up database when runni ng on remote server
+    call this along with populate.py and picfinder.py to fill up database when running on remote server
     """
     mirrorcards()
     add_dct_data(cards())
