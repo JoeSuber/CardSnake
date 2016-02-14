@@ -290,6 +290,9 @@ class Simile(object):
         """
         return self.ids[np.where(self.gmp_hamm(self.ups,  dct) < cutval)]
 
+    def hamm_down(self, dct, cutval):
+        return self.ids[np.where(self.gmp_hamm(self.dwn,  dct) < cutval)]
+
 
 def mirror_cards():
     """
