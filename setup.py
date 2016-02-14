@@ -1,9 +1,16 @@
+"""
+gmp2 may need the gnu-mpc c library installed before it will work
+grequests needs greenlet, which needs a c compiler to install itself
+cv2 is opencv - 2.4.x or 3.x - cv2.so or cv2.dll should be placed in the 'site-packages' your python interp. is using
+numpy and python-Levenshein are also in need of a compiler for install
+"""
+
 from distutils.core import setup
 
 setup(
         name='CardSnake',
         version='.1',
-        packages=['requests', 'grequests', 'python-Levenshtein', 'gmpy2', 'numpy', 'path.py'],
+        packages=['requests', 'grequests', 'python-Levenshtein', 'gmpy2', 'numpy', 'path.py', 'cv2'],
         url='https://github.com/Joesuber/CardSnake',
         license='MIT',
         author='Joe Suber',
