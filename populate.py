@@ -21,7 +21,6 @@ from collections import Counter
 from itertools import izip, repeat
 import time
 
-
 DEBUG = True
 __author__ = 'suber1'
 __sqlext__ = '.sqlite'

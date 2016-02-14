@@ -201,11 +201,11 @@ def populate_links(setcodes):
                     peep.card_db.cur.execute(usql, (revlinks[w[name_col].encode('utf-8')].pop(), w['id']))
                     continue
                 except IndexError:
-                    print(u"Already used the last picture link for '{}'".format(w[name_col]))
+                    print(u"set {} has no remaining exact match for: '{}'".format(s, w[name_col].encode('utf-8')))
                     # remove the key since it has no links remaining
                     revlinks.pop(w[name_col].encode('utf-8'))
                 except KeyError:
-                    print(u"{}: No Key-name for: '{}'".format(x, w[name_col].encode('utf-8')))
+                    print(u"{}: {} has No Key-name for: '{}'".format(x, s, w[name_col].encode('utf-8')))
                 work.appendleft(w)
 
         msg = u"started: {}   by numbers down to: {}   by exact names: {}  " \
