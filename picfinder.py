@@ -57,7 +57,7 @@ def setcodeinfo():
 
 def linkup(line):
     # in: '    <td><a href="/isd/en/2.html">Angel of Flight Alabaster</a></td>'
-    # out: ('Angel of Flight Alabaster', 'http://magiccards.info/scans/en/isd/2.jpg')
+    # out: ('http://magiccards.info/scans/en/isd/2.jpg', 'Angel of Flight Alabaster')
     a, b = line.split('.html">')
     ms, num = a.split('    <td><a href="/')[1].split('/en/')
     name = b.split('</a>')[0].strip()
