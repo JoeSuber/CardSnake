@@ -309,7 +309,7 @@ def mirror_cards():
     lll = orient_db.cur.execute("SELECT id, top_dct, picpath FROM orient").fetchall()
     for n, l in enumerate(lll):
         if not l['picpath']:
-            print "Deleting from orient:", n, l['id'], l['picpath']
+            print "Deleting from orient:", n, idname(l['id'])
             orient_db.cur.execute("DELETE FROM orient WHERE id=?", (l['id'],))
     orient_db.con.commit()
     return 1
