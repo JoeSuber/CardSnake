@@ -332,12 +332,13 @@ def akazer(pics=None, akaze=None, columns='ak_points,ak_desc'):
     if akaze is None:
         akaze = cv2.AKAZE_create()
     c1, c2 = columns.split(',')
+    print pics
     for kk, vv in pics.viewitems():
         if vv:
             im = cv2.imread(vv)
         else:
             im = None
-        if im:
+        if im is not None:
             akps, adesc = akaze.detectAndCompute(im, None)
             jk = [(a.pt, a.angle, a.class_id, a.octave, a.response, a.size) for a in akps]
             new_data.append({'id': kk, c1: jk, c2: adesc.dumps()})
@@ -363,7 +364,7 @@ def get_kpdesc(id, columns='ak_points,ak_desc'):
 def test_akazer(startstop=(0, 100)):
     allcards = cards()
     start, stop = startstop
-    testcards = [c for n, c in enumerate(allcards) if (start <= n < stop)]
+    testcards = {id: cp for n, (id, cp) in enumerate(allcards.viewitems()) if (start <= n < stop)}
     datas = akazer(pics=testcards)
     return datas
 
