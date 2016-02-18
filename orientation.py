@@ -320,7 +320,7 @@ def akazer(pics=None, akaze=None, columns='ak_points,ak_desc'):
     Parameters
     ----------
     pics = {id: local-path-to-pic, ...}
-    akaze = cv2.AKAZE_create() or maybe cv2.ORB_create()
+    akaze = cv2.AKAZE_create() or cv2.ORB_create() or cv2.KAZE_create() etc..
     columns = two comma separated column names for the new data
     Returns
     -------
@@ -360,14 +360,27 @@ def get_kpdesc(id, columns='ak_points,ak_desc'):
             for a in line[c1]], np.loads(line[c2])
 
 
-def test_akazer(startstop=(0, 100)):
-    allcards = cards()
-    start, stop = startstop
-    testcards = {id: cp for n, (id, cp) in enumerate(allcards.viewitems()) if (start <= n < stop)}
-    with Timer(msg="akazer!"):
-        datas = akazer(pics=testcards)
-
-    return datas
+def run_akazer(workchunk=100, db=orient_db, dbtable='orient', columns='ak_points,ak_desc', fs=peep.__mtgpics__):
+    pntcol, desc_col = columns.split(',')
+    ADD_COLUMNS = False
+    needed = []
+    current_columns = db.show_columns(dbtable)
+    if (pntcol not in current_columns) or (desc_col not in current_columns):
+        ADD_COLUMNS = True
+        needed = db.cur.execute("SELECT id, picpath FROM {} WHERE picpath IS NOT NULL".format(dbtable)).fetchall()
+    else:
+        needed = db.cur.execute("SELECT id, picpath FROM {} WHERE picpath IS NOT NULL and {} IS NULL"
+                                .format(dbtable, pntcol)).fetchall()
+    if len(needed) < 1:
+        print("finished adding keypoint and descriptor data")
+        return 0
+    cardstack = {want['id']: os.path.join(fs, want['picpath']) for n, want in enumerate(needed) if n < workchunk}
+    with Timer(msg="processing {} of {} that remain".format(min(workchunk, len(needed)), len(needed))):
+        dataa = akazer(pics=cardstack, columns=columns)
+        if ADD_COLUMNS:
+            db.add_columns(dbtable, peep.column_type_parser(dataa))
+        db.add_data(dataa, dbtable, key_column='id')
+    return 1
 
 
 def init_and_check():
@@ -378,7 +391,8 @@ def init_and_check():
     add_dct_data(cards())
     for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
-
+    while run_akazer(workchunk=100, db=orient_db, dbtable='orient', columns='ak_points,ak_desc'):
+        continue
 
 def main():
     """
