@@ -15,6 +15,8 @@ from gmpy2 import mpz
 import cv2
 import numpy as np
 from collections import defaultdict, Counter, deque
+import json
+from cv2_common import *
 
 __RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image's-bottom-border at art-line
 
@@ -311,6 +313,61 @@ def mirror_cards():
     return 1
 
 
+def akazer(pics=None, akaze=None, columns='ak_points,ak_desc'):
+    """
+    Not just for AKAZE any more!
+
+    Parameters
+    ----------
+    pics = {id: local-path-to-pic, ...}
+    akaze = cv2.AKAZE_create() or maybe cv2.ORB_create()
+    columns = two comma separated column names for the new data
+    Returns
+    -------
+    list of image data formatted for entering into cards database
+    """
+    new_data = []
+    if pics is None:
+        pics = cards()
+    if akaze is None:
+        akaze = cv2.AKAZE_create()
+    c1, c2 = columns.split(',')
+    for kk, vv in pics.viewitems():
+        if vv:
+            im = cv2.imread(vv)
+        else:
+            im = None
+        if im:
+            akps, adesc = akaze.detectAndCompute(im, None)
+            jk = [(a.pt, a.angle, a.class_id, a.octave, a.response, a.size) for a in akps]
+            new_data.append({'id': kk, c1: jk, c2: adesc.dumps()})
+        else:
+            print("for id: {}, akazer failed to find pic on path: {}".format(kk, vv))
+    return new_data
+
+
+def get_kpdesc(id, columns='ak_points,ak_desc'):
+    """
+    retrieve and re-hydrate the key-point and descriptor data for a single card id
+    """
+    c1, c2 = columns.split(',')
+    try:
+        line = orient_db.cur.execute("SELECT {}, {} FROM orient WHERE id=?".format(c1, c2), (id,)).fetchone()
+    except Exception as e:
+        print("{} -- trouble fetching kp from orient: {} for {}, {}".format(id, c1, c2))
+        exit()
+    return [cv2.KeyPoint(x=a[0][0], y=a[0][1], _angle=a[1], _class_id=a[2], _octave=a[3], _response=a[4], _size=a[5])
+            for a in line[c1]], np.loads(line[c2])
+
+
+def test_akazer(startstop=(0, 100)):
+    allcards = cards()
+    start, stop = startstop
+    testcards = [c for n, c in enumerate(allcards) if (start <= n < stop)]
+    datas = akazer(pics=testcards)
+    return datas
+
+
 def init_and_check():
     """
     call this along with populate.py and picfinder.py to fill up database when running on remote server
@@ -319,6 +376,13 @@ def init_and_check():
     add_dct_data(cards())
     for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
+
+
+def test():
+    """Stupid test function"""
+    L = []
+    for i in range(100):
+        L.append(i)
 
 
 def main():
@@ -394,4 +458,5 @@ def main():
         #bring_up()
 
 if __name__ == "__main__":
+
     exit(main())
