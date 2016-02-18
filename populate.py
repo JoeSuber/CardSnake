@@ -223,7 +223,8 @@ def column_parser(datas, exclusions=None, DEBUG=DEBUG):
 
 def column_type_parser(datas, exclusions=None, types_map=None, DEBUG=DEBUG):
     """
-    supply columns & types that need to be added to db from import data
+    this supplies columns & types that need to be added to db from import data
+    datas: your list of dict containing the data that may not have column-headers (keys) in db
     types_map: user created {'python type() output as string': 'sqlite-data-type', ...}
     - returns -
     type_defs: {'column-name': 'appropriate sqlite-data-type', ...}

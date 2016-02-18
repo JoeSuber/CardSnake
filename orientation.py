@@ -332,7 +332,6 @@ def akazer(pics=None, akaze=None, columns='ak_points,ak_desc'):
     if akaze is None:
         akaze = cv2.AKAZE_create()
     c1, c2 = columns.split(',')
-    print pics
     for kk, vv in pics.viewitems():
         if vv:
             im = cv2.imread(vv)
@@ -365,7 +364,9 @@ def test_akazer(startstop=(0, 100)):
     allcards = cards()
     start, stop = startstop
     testcards = {id: cp for n, (id, cp) in enumerate(allcards.viewitems()) if (start <= n < stop)}
-    datas = akazer(pics=testcards)
+    with Timer(msg="akazer!"):
+        datas = akazer(pics=testcards)
+
     return datas
 
 
@@ -377,13 +378,6 @@ def init_and_check():
     add_dct_data(cards())
     for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
-
-
-def test():
-    """Stupid test function"""
-    L = []
-    for i in range(100):
-        L.append(i)
 
 
 def main():
