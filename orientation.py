@@ -17,6 +17,7 @@ import numpy as np
 from collections import defaultdict, Counter, deque
 import json
 from cv2_common import *
+from sqlite3 import Binary
 
 __RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image's-bottom-border at art-line
 
@@ -102,12 +103,11 @@ def add_dct_data(cardpaths):
     """
     datas = []
     counter = 0
-    q = orient_db.cur.execute("SELECT * FROM orient").fetchall()
     print("Calculating DCT data...")
     for idc, fsp in cardpaths.viewitems():
         #id, top_dct, picpath, face
-        current_card = orient_db.cur.execute("SELECT * FROM orient WHERE id=(?)", (idc,)).fetchone()
-        # print fsp, current_card
+        current_card = orient_db.cur.execute("SELECT id, top_dct FROM orient WHERE id=(?)", (idc,)).fetchone()
+        #print "AFF", fsp, current_card
         if fsp and not current_card['top_dct']:
             counter += 1
             if not (counter % 200):
@@ -301,13 +301,15 @@ def mirror_cards():
     see which items in card db need to be added to orient, then add them.
     then remove null paths that may have crept into orient_db
     """
-    cardlist = peep.card_db.cur.execute("SELECT id, pic_path FROM cards").fetchall()
-    mirroring = ({'id': c['id'], 'picpath': c['pic_path']} for c in cardlist if c['pic_path'])
-    orient_db.add_data(mirroring, 'orient', key_column='id')
+    #cardlist = peep.card_db.cur.execute("SELECT id, pic_path FROM cards").fetchall()
+    #mirroring = ({'id': c['id'], 'picpath': c['pic_path']} for c in cardlist if c['pic_path'])
+    #orient_db.add_data(mirroring, 'orient', key_column='id')
+    orient_db.cur.execute("INSERT or IGNORE INTO orient(id, picpath) SELECT id, pic_path from cards")
+    orient_db.con.commit()
     lll = orient_db.cur.execute("SELECT id, top_dct, picpath FROM orient").fetchall()
     for n, l in enumerate(lll):
         if not l['picpath']:
-            print "Delete from orient:", n, l['id'], l['picpath']
+            print "Deleting from orient:", n, l['id'], l['picpath']
             orient_db.cur.execute("DELETE FROM orient WHERE id=?", (l['id'],))
     orient_db.con.commit()
     return 1
@@ -340,7 +342,7 @@ def akazer(pics=None, akaze=None, columns='ak_points,ak_desc'):
         if im is not None:
             akps, adesc = akaze.detectAndCompute(im, None)
             jk = [(a.pt, a.angle, a.class_id, a.octave, a.response, a.size) for a in akps]
-            new_data.append({'id': kk, c1: jk, c2: adesc.dumps()})
+            new_data.append({'id': kk, c1: jk, c2: Binary(adesc.dumps())})
         else:
             print("for id: {}, akazer failed to find pic on path: {}".format(kk, vv))
     return new_data
@@ -388,11 +390,14 @@ def init_and_check():
     call this along with populate.py and picfinder.py to fill up database when running on remote server
     """
     mirror_cards()
+    print("mirror done")
     add_dct_data(cards())
+    print("add dct done")
     for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
-    while run_akazer(workchunk=100, db=orient_db, dbtable='orient', columns='ak_points,ak_desc'):
+    while run_akazer(workchunk=150, db=orient_db, dbtable='orient', columns='ak_points,ak_desc'):
         continue
+
 
 def main():
     """
