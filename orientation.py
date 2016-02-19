@@ -415,6 +415,14 @@ def main():
     print("- Press <c> to capture & compare & then to clear all cards - ")
     print("- Press <f> to only use cards with detected 'faces' in them -")
     kazy = cv2.AKAZE_create()
+
+    FLANN_INDEX_KDTREE = 1
+    FLANN_INDEX_LSH    = 6
+    flann_params = dict(algorithm=FLANN_INDEX_LSH,
+                       table_number=6, # 12
+                       key_size=12,     # 20
+                       multi_probe_level=1) #2
+    flann = cv2.FlannBasedMatcher(flann_params, {})
     while True:
         ret, frame = cap.read()
         FACE_ONLY = False
@@ -428,7 +436,7 @@ def main():
             cv2.destroyAllWindows()
             localface = face_cascade.detectMultiScale(cv2.equalizeHist(gray), scaleFactor=1.2, minNeighbors=3)
 
-            if len(localface):
+            if len(localface) and FACE_ONLY:
                 xf, yf, wf, hf = 0, 0, 0, 0
                 for (x, y, w, h) in localface:
                     xf, yf = max(xf, x-20), max(yf, y-30)
@@ -437,10 +445,12 @@ def main():
                 kp, desc = kazy.detectAndCompute(img, None)
                 cv2.imshow("Face only", img)
                 dct = dct_hint(img)
+                img1 = img
             else:
                 cv2.imshow("frame", gray)
                 kp, desc = kazy.detectAndCompute(gray, None)
                 dct = dct_hint(gray)
+                img1 = gray
             SEARCH = True
             ch = ''
 
@@ -449,22 +459,35 @@ def main():
                     # pull from only the database items that have detected faces <f>
                     list1 = smiles.hamm_ups(dct, default_distance)
                     list2 = smiles.hamm_ups(dct, default_distance - 1)
+                    FACE_ONLY = False
                 else:
                     # pull from all database items <c>
                     list1 = simulate.hamm_ups(dct, default_distance)
                     list2 = simulate.hamm_ups(dct, default_distance - 1)
-                if len(list1) < 1:
+                if len(list1) < 2:
                     default_distance += 2
                     continue
-                if len(list2) > 0:
+                if len(list2) > 1:
                     default_distance -= 1
                     continue
+
                 SEARCH = False
+
                 print("at distance = {}".format(default_distance))
-                for l in list1:
+                for num, l in enumerate(list1):
                     ckp, cdesc = get_kpdesc(l)
-                    print ckp, cdesc
-                ch = showpics(list1)
+                    allmn = flann.knnMatch(desc, cdesc, k=2)
+                    filtered_m = []
+                    if len(allmn) > 1:
+                        filtered_m = [[m] for m, n in allmn if m.distance < (0.75 * n.distance)]
+                    if filtered_m:
+                        imp = orient_db.cur.execute("SELECT picpath FROM orient WHERE id=(?)", (l,)).fetchone()
+
+                        img2 = cv2.imread(os.path.join(peep.__mtgpics__, imp['picpath']))
+                        img3 = cv2.drawMatchesKnn(img1, kp, img2, ckp, filtered_m, outImg=np.zeros((600, 800), dtype=np.uint8), flags=2)
+                        cv2.imshow("{}".format(num), img3)
+                    # print len(matches), matches[0][0].distance, matches[0][1].distance
+                ch = cv2.waitKey(0) & 0xFF
 
         if ch == 27:    # <esc>
             cv2.destroyAllWindows()
