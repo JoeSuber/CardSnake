@@ -359,7 +359,7 @@ def get_kpdesc(id, columns='ak_points,ak_desc'):
         print("{} -- trouble fetching kp from orient: {} for {}, {}".format(id, c1, c2))
         exit()
     return [cv2.KeyPoint(x=a[0][0], y=a[0][1], _angle=a[1], _class_id=a[2], _octave=a[3], _response=a[4], _size=a[5])
-            for a in line[c1]], np.loads(line[c2])
+            for a in line[c1]], np.loads(str(line[c2]))
 
 
 def run_akazer(workchunk=100, db=orient_db, dbtable='orient', columns='ak_points,ak_desc', fs=peep.__mtgpics__):
@@ -390,9 +390,9 @@ def init_and_check():
     call this along with populate.py and picfinder.py to fill up database when running on remote server
     """
     mirror_cards()
-    print("mirror done")
+    #print("mirror done")
     add_dct_data(cards())
-    print("add dct done")
+    #print("add dct done")
     for nn, qq in find_faces(needed_faces(cards(), examine_zeros=False)).viewitems():
         print("with {} face(s) --> {}".format(nn, qq))
     while run_akazer(workchunk=150, db=orient_db, dbtable='orient', columns='ak_points,ak_desc'):
@@ -414,7 +414,7 @@ def main():
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
     print("- Press <c> to capture & compare & then to clear all cards - ")
     print("- Press <f> to only use cards with detected 'faces' in them -")
-
+    kazy = cv2.AKAZE_create()
     while True:
         ret, frame = cap.read()
         FACE_ONLY = False
@@ -434,11 +434,12 @@ def main():
                     xf, yf = max(xf, x-20), max(yf, y-30)
                     wf, hf = min(xf + w + 40, gray.shape[1]), min(yf + h + 60, gray.shape[0])
                 img = gray[yf:hf, xf:wf]
-                print xf, yf, wf, hf
+                kp, desc = kazy.detectAndCompute(img, None)
                 cv2.imshow("Face only", img)
                 dct = dct_hint(img)
             else:
                 cv2.imshow("frame", gray)
+                kp, desc = kazy.detectAndCompute(gray, None)
                 dct = dct_hint(gray)
             SEARCH = True
             ch = ''
@@ -460,6 +461,9 @@ def main():
                     continue
                 SEARCH = False
                 print("at distance = {}".format(default_distance))
+                for l in list1:
+                    ckp, cdesc = get_kpdesc(l)
+                    print ckp, cdesc
                 ch = showpics(list1)
 
         if ch == 27:    # <esc>
