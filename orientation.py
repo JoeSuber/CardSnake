@@ -482,9 +482,9 @@ def main():
                         filtered_m = [[m] for m, n in allmn if m.distance < (0.75 * n.distance)]
                     if filtered_m:
                         imp = orient_db.cur.execute("SELECT picpath FROM orient WHERE id=(?)", (l,)).fetchone()
-
                         img2 = cv2.imread(os.path.join(peep.__mtgpics__, imp['picpath']))
-                        img3 = cv2.drawMatchesKnn(img1, kp, img2, ckp, filtered_m, outImg=np.zeros((600, 800), dtype=np.uint8), flags=2)
+                        img3 = cv2.drawMatchesKnn(img1, kp, img2, ckp, filtered_m,
+                                                  outImg=np.zeros((600, 800), dtype=np.uint8), flags=2)
                         cv2.imshow("{}".format(num), img3)
                     # print len(matches), matches[0][0].distance, matches[0][1].distance
                 ch = cv2.waitKey(0) & 0xFF
