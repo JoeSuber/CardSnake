@@ -6,18 +6,18 @@ generate some dct data if needed. Use it to help determine the most similar imag
 
 run populate first, then picfinder, then run orientation and wait a few minutes while new dcts are added to database
 """
-import sys
-reload(sys).setdefaultencoding("utf8")
-import populate as peep
-import os
+from collections import defaultdict, Counter, deque
 import gmpy2
 from gmpy2 import mpz
-import cv2
-import numpy as np
-from collections import defaultdict, Counter, deque
-import json
 from cv2_common import *
 from sqlite3 import Binary
+import populate as peep
+import sys
+reload(sys).setdefaultencoding("utf8")
+# import cv2
+# import numpy as np
+# import json
+# import os
 
 __RAT__ = 0.80  # image height = __RAT__* width. This mostly puts top-image's-bottom-border at art-line
 
@@ -87,10 +87,11 @@ def find_faces(cardmap, scale=1.25, min_neighbor=4):
     for n, (id, cardpath) in enumerate(cardmap.viewitems()):
         faces = face_cascade.detectMultiScale(cv2.equalizeHist(cv2.imread(cardpath, cv2.IMREAD_GRAYSCALE)),
                                               scaleFactor=scale, minNeighbors=min_neighbor)
-        if len(faces):
-            print("{}: {}: has {} face{}".format(n, cardpath, len(faces), 's' if len(faces) > 1 else ''))
-        facecount[len(faces)] += 1
-        orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (len(faces), id))
+        face_quant = len(faces)
+        if face_quant:
+            print("{}: {}: has {} face{}".format(n, cardpath, face_quant, 's' if face_quant > 1 else ''))
+        facecount[face_quant] += 1
+        orient_db.cur.execute("UPDATE orient SET face=(?) WHERE id=(?)", (face_quant, id))
     orient_db.con.commit()
     return facecount
 
@@ -98,7 +99,7 @@ def find_faces(cardmap, scale=1.25, min_neighbor=4):
 def add_dct_data(cardpaths):
     """
     sock away top and bottom dcts of pics as a persistent 64-bit int
-    cardpaths = {card['id']: card['pic_path'], card['id']: None, ...}
+    cardpaths = {card['id']: os.path.join(__local_dir__, card['pic_path']), card['id']: None, ...}
     cardpaths should be drawn from card_db where they are already vetted
     """
     datas = []
@@ -115,7 +116,7 @@ def add_dct_data(cardpaths):
             shortpath = os.path.sep.join(fsp.split(os.path.sep)[-2:])
             im = cv2.equalizeHist(cv2.imread(fsp, cv2.IMREAD_GRAYSCALE))
             height, width = im.shape[:2]
-            datas.append({'id': idc, 'face': current_card['face'], 'picpath': shortpath,
+            datas.append({'id': idc, 'picpath': shortpath,
                           'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
                           'bot_dct': gmpy2.digits(dct_hint(im[height - width*__RAT__:height, :width]))})
     print("{} new pics dct'd".format(counter))
@@ -145,22 +146,12 @@ def show(cardpaths):
 
 def getdcts(only_faces=False):
     """
-    takes the dry, text version of the dcts stored in the database and hydrates them into mpz() objects
+    takes text version of the dcts stored in the database and hydrates them into lists of mpz() objects
     """
-    dcts = orient_db.cur.execute("SELECT top_dct, bot_dct, id, face FROM orient").fetchall()
-    ups = [gmpy2.mpz(up['top_dct']) for up in dcts]
-    downs = [gmpy2.mpz(down['bot_dct']) for down in dcts]
-    ids = [i['id'] for i in dcts]
-    if only_faces:
-        ups, downs, ids = deque(ups), deque(downs), deque(ids)
-        for line in dcts:
-            u, d, i = ups.pop(), downs.pop(), ids.pop()
-            if line['face']:
-                ups.appendleft(u)
-                downs.appendleft(d)
-                ids.appendleft(i)
-        ups, downs, ids = list(ups), list(downs), list(ids)
-    return ups, downs, ids
+    outgoing = np.vstack(((mpz(line['top_dct']), mpz(line['bot_dct']), line['face'], line['id'])
+                          for line in orient_db.cur.execute("SELECT top_dct, bot_dct, id, face FROM orient").fetchall()))
+    facemask = np.where(outgoing[:, 2] >= only_faces)
+    return outgoing[facemask, 0].tolist(), outgoing[facemask, 1].tolist(), outgoing[facemask, 3].tolist()
 
 
 def npydcts():
@@ -295,22 +286,18 @@ class Simile(object):
     def hamm_down(self, dct, cutval):
         return self.ids[np.where(self.gmp_hamm(self.dwn,  dct) < cutval)]
 
+    def is_top(self, dct):
+        print "score ups: ", np.sum(self.gmp_hamm(self.ups, dct))
+        print "score down: ", np.sum(self.gmp_hamm(self.dwn, dct))
+        return np.sum(self.gmp_hamm(self.ups, dct)) < np.sum(self.gmp_hamm(self.dwn, dct))
+
 
 def mirror_cards():
     """
     see which items in card db need to be added to orient, then add them.
-    then remove null paths that may have crept into orient_db
     """
-    #cardlist = peep.card_db.cur.execute("SELECT id, pic_path FROM cards").fetchall()
-    #mirroring = ({'id': c['id'], 'picpath': c['pic_path']} for c in cardlist if c['pic_path'])
-    #orient_db.add_data(mirroring, 'orient', key_column='id')
-    orient_db.cur.execute("INSERT or IGNORE INTO orient(id, picpath) SELECT id, pic_path from cards")
-    orient_db.con.commit()
-    lll = orient_db.cur.execute("SELECT id, top_dct, picpath FROM orient").fetchall()
-    for n, l in enumerate(lll):
-        if not l['picpath']:
-            print "Deleting from orient:", n, idname(l['id'])
-            orient_db.cur.execute("DELETE FROM orient WHERE id=?", (l['id'],))
+    orient_db.cur.execute("""INSERT or IGNORE INTO orient(id, picpath)
+                              SELECT id, pic_path from cards WHERE pic_path IS NOT NULL""")
     orient_db.con.commit()
     return 1
 
@@ -365,19 +352,19 @@ def get_kpdesc(id, columns='ak_points,ak_desc'):
 def run_akazer(workchunk=100, db=orient_db, dbtable='orient', columns='ak_points,ak_desc', fs=peep.__mtgpics__):
     pntcol, desc_col = columns.split(',')
     ADD_COLUMNS = False
-    needed = []
     current_columns = db.show_columns(dbtable)
     if (pntcol not in current_columns) or (desc_col not in current_columns):
         ADD_COLUMNS = True
-        needed = db.cur.execute("SELECT id, picpath FROM {} WHERE picpath IS NOT NULL".format(dbtable)).fetchall()
+        needed = db.cur.execute("SELECT id, picpath FROM {} WHERE picpath IS NOT NULL"
+                                .format(dbtable)).fetchmany(size=workchunk)
     else:
         needed = db.cur.execute("SELECT id, picpath FROM {} WHERE picpath IS NOT NULL and {} IS NULL"
-                                .format(dbtable, pntcol)).fetchall()
+                                .format(dbtable, pntcol)).fetchmany(size=workchunk)
     if len(needed) < 1:
         print("finished adding keypoint and descriptor data")
         return 0
-    cardstack = {want['id']: os.path.join(fs, want['picpath']) for n, want in enumerate(needed) if n < workchunk}
-    with Timer(msg="processing {} of {} that remain".format(min(workchunk, len(needed)), len(needed))):
+    cardstack = {want['id']: os.path.join(fs, want['picpath']) for want in needed}
+    with Timer(msg="processing {} new items".format(workchunk)):
         dataa = akazer(pics=cardstack, columns=columns)
         if ADD_COLUMNS:
             db.add_columns(dbtable, peep.column_type_parser(dataa))
