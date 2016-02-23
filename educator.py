@@ -1,3 +1,6 @@
+#!/usr/bin/env python -S
+# -*- coding: utf-8 -*-
+
 """
 use orient db to:
 1) allow user to take a pic via camera, save it to a local dir, get dct and keypoint/desc info into db
@@ -29,4 +32,29 @@ use orient db to:
         a) Build some multiple-sample based recognition into database for the card back (based on input images).
             Perhaps some 'hard-coded' dct_hint could be included in source-code for card backs
 """
+import cv2
+import numpy as np
+import orientation
 
+
+def main():
+    cardimg = cv2.imread('pics/2ED/un100.jpg')
+    yc, xc = cardimg.shape[:2]
+    M = cv2.getRotationMatrix2D((xc/2, yc/2), 90, 1)
+    cardside = cv2.warpAffine(cardimg, M, (xc, yc))
+    print cardside.shape
+    
+    cam = cv2.VideoCapture(0)
+    while True:
+        __, frame = cam.read()
+        show = frame.copy()
+        cv2.rectangle(show, (1,1), (799,599), (0,255,0))
+        cv2.imshow("cam", show)
+        ch = cv2.waitKey(1) & 0xff
+        if ch == 27:
+            cv2.destroyAllWindows()
+            break
+
+
+if __name__ == "__main__":
+    exit(main())

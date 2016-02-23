@@ -33,13 +33,61 @@ orient_db.add_columns('orient', {'top_dct': 'TEXT', 'bot_dct': 'TEXT', 'picpath'
 def dct_hint(im, hsize=32):
     """ because we take the measure against the mean, no need to convert float32.
     returning DCT hash as 64-bit mpz int, which makes popcount exceedingly fast"""
-    q = 0
+    q = mpz()
     bumpy = cv2.dct(np.array(cv2.resize(im, dsize=(hsize, hsize),
                                         interpolation=cv2.INTER_AREA), dtype=np.float32))[:8, 1:9]
+    #print((bumpy>np.mean(bumpy)).ravel())
     for i, j in enumerate((bumpy > np.mean(bumpy)).ravel()):
         if j:
             q += 1 << i
-    return mpz(q)
+    return q
+
+
+def dct_hint2(im, hsize=32):
+    """ because we take the measure against the mean, no need to convert float32.
+    returning DCT hash as 64-bit mpz int, which makes popcount exceedingly fast"""
+    q = mpz()
+    bumpy = cv2.dct(np.array(cv2.resize(im, dsize=(hsize, hsize),
+                                        interpolation=cv2.INTER_AREA), dtype=np.float32))[:8, 1:9]
+    #print(bumpy.ravel() > np.mean(bumpy))
+    for i in np.where(np.hstack(bumpy > np.mean(bumpy)))[0]:
+        q += 1 << i
+    return q
+
+
+@contextmanager
+def Mytime(scoresheet):
+    start = clock()
+    try:
+        yield
+    finally:
+        scoresheet.append(clock()-start)
+
+
+def race(picquant=100, pics='pics/2ED/un{}.jpg', alg1=dct_hint2, alg2=dct_hint):
+    pics = [cv2.equalizeHist(cv2.imread(pics.format(x), cv2.IMREAD_GRAYSCALE)) for x in xrange(1, picquant+1)]
+    print("{} pics loaded".format(len(pics)))
+    time1, time2, res1, res2 = [], [], [], []
+    sched = [np.random.rand() > 0.5 for x in xrange(len(pics))]
+    order=[(alg1, time1, res1), (alg2, time2, res2)]
+    for n, s in enumerate(sched):
+        pic = pics[n]
+        if s:
+            order = [order[1], order[0]]
+        for alg, t, results in order:
+            with Mytime(t):
+                results.append(alg(pic))
+
+    for al, t, __ in order:
+        v = np.vstack(t)
+        w, s = np.mean(v)*1000, np.std(v)*1000
+        print("{}: {} trials, mean time: {}ms, stdev: {}ms".format(al.__repr__(), len(t), w, s))
+
+    for n, (a, b) in enumerate(zip(order[0][2], order[1][2])):
+        try:
+            assert(a==b)
+        except Exception:
+            print("{:6}: {:0b} of {} not equal to {:0b} of {}".format(n, a, type(a), b, type(b)))
 
 
 def cards(fs=peep.__mtgpics__):
