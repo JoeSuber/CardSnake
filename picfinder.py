@@ -16,8 +16,6 @@ get the missing pics of cards downloaded to a local directory structure.
 record the paths in the database.
 """
 
-import sys
-reload(sys).setdefaultencoding("utf8")
 import populate as peep
 import requests, grequests
 from collections import deque, defaultdict, Counter
@@ -26,7 +24,8 @@ from operator import itemgetter
 from itertools import izip
 import os
 import json
-
+import sys
+reload(sys).setdefaultencoding("utf8")
 
 __db_pic_col__ = {'pic_path': 'TEXT'}
 __db_link__ = {'pic_link': 'TEXT'}

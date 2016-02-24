@@ -10,7 +10,6 @@ uses: http://mtgjson.com/json/changelog.json to update card db entries that have
 
 after running populate.py, run picfinder.py to check magiccards.info for downloadable pictures of cards
 """
-
 import os
 import path
 import json
@@ -20,6 +19,9 @@ import grequests
 from collections import Counter
 from itertools import izip, repeat
 import time
+import sys
+reload(sys).setdefaultencoding("utf8")
+
 
 DEBUG = True
 __author__ = 'suber1'
@@ -50,7 +52,8 @@ __types__ = {"<type 'list'>": 'json',
              "<type 'float'>": 'REAL',
              "<type 'int'>": 'INTEGER',
              "<type 'dict'>": 'json',
-             "<type 'bool'>": 'TEXT'}
+             "<type 'bool'>": 'TEXT',
+             "<type 'buffer'>": 'BLOB'}
 
 
 class DBMagic (object):
