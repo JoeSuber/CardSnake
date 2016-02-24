@@ -31,8 +31,7 @@ orient_db.add_columns('orient', {'top_dct': 'TEXT', 'bot_dct': 'TEXT', 'picpath'
 
 
 def dct_hint(im, hsize=32):
-    """ because we take the measure against the mean, no need to convert float32.
-    returning DCT hash as 64-bit mpz int, which makes popcount exceedingly fast"""
+    """ returning DCT hash as 64-bit mpz int, which makes popcount faster"""
     q = mpz()
     bumpy = cv2.dct(np.array(cv2.resize(im, dsize=(hsize, hsize),
                                         interpolation=cv2.INTER_AREA), dtype=np.float32))[:8, 1:9]
@@ -44,8 +43,7 @@ def dct_hint(im, hsize=32):
 
 
 def dct_hint2(im, hsize=32):
-    """ because we take the measure against the mean, no need to convert float32.
-    returning DCT hash as 64-bit mpz int, which makes popcount exceedingly fast"""
+    """ doesn't give the same results due to some undercover type coercion, and is a hair slower"""
     q = mpz()
     bumpy = cv2.dct(np.array(cv2.resize(im, dsize=(hsize, hsize),
                                         interpolation=cv2.INTER_AREA), dtype=np.float32))[:8, 1:9]
@@ -65,6 +63,9 @@ def Mytime(scoresheet):
 
 
 def race(picquant=100, pics='pics/2ED/un{}.jpg', alg1=dct_hint2, alg2=dct_hint):
+    """
+    for testing speed of some similar functions
+    """
     pics = [cv2.equalizeHist(cv2.imread(pics.format(x), cv2.IMREAD_GRAYSCALE)) for x in xrange(1, picquant+1)]
     print("{} pics loaded".format(len(pics)))
     time1, time2, res1, res2 = [], [], [], []
@@ -192,16 +193,6 @@ def show(cardpaths):
     return ch
 
 
-def getdcts(only_faces=False):
-    """
-    takes text version of the dcts stored in the database and hydrates them into lists of mpz() objects
-    """
-    outgoing = np.vstack(((mpz(line['top_dct']), mpz(line['bot_dct']), line['face'], line['id'])
-                          for line in orient_db.cur.execute("SELECT top_dct, bot_dct, id, face FROM orient").fetchall()))
-    facemask = np.where(outgoing[:, 2] >= only_faces)
-    return outgoing[facemask, 0].tolist(), outgoing[facemask, 1].tolist(), outgoing[facemask, 3].tolist()
-
-
 def npydcts():
     """
     if we want numpy's version of unsigned, 64-bit integers to represent
@@ -313,10 +304,14 @@ def bring_up():
 
 
 class Simile(object):
-    def __init__(self, u, d, i):
-        self.ups = np.vstack(np.array(u, dtype=object))
-        self.dwn = np.vstack(np.array(d, dtype=object))
-        self.ids = np.vstack(i)
+    def __init__(self, just_faces=False):
+        outgoing = np.vstack(((mpz(line['top_dct']), mpz(line['bot_dct']), line['face'], line['id']) for line in
+                              orient_db.cur.execute("SELECT top_dct, bot_dct, id, face FROM orient").fetchall()))
+        facemask = np.where(outgoing[:, 2] >= just_faces)
+        self.ups = outgoing[facemask, 0]
+        self.dwn = outgoing[facemask, 1]
+        self.ids = outgoing[facemask, 3]
+        self.default_distance = 15
         # vectorize lets gmpy2.hamdist get 'broadcast' over numpy arrays. speedily.
         self.gmp_hamm = np.vectorize(gmpy2.hamdist)
 
@@ -335,9 +330,40 @@ class Simile(object):
         return self.ids[np.where(self.gmp_hamm(self.dwn,  dct) < cutval)]
 
     def is_top(self, dct):
-        print "score ups: ", np.sum(self.gmp_hamm(self.ups, dct))
+        print "score ups:  ", np.sum(self.gmp_hamm(self.ups, dct))
         print "score down: ", np.sum(self.gmp_hamm(self.dwn, dct))
         return np.sum(self.gmp_hamm(self.ups, dct)) < np.sum(self.gmp_hamm(self.dwn, dct))
+
+    def handful(self, img, flipit=15):
+        """
+        img: full image probably lifted from a user input device
+        flipit: the hamming distance where it may be wise to try an inverted version of img to get closer results
+        powermotionsales
+
+        Returnskkkkk
+        -------
+        list1: a minimal list of ids-to-database-images with the closest hamming distance
+        to the top or bottom of the input img dct.
+        """
+        d = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[0:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+        SEARCH = True
+        while SEARCH:
+            list1 = self.hamm_ups(d, self.default_distance)
+            list2 = self.hamm_ups(d, self.default_distance - 1)
+            if len(list1) < 3:
+                self.default_distance += 2
+                continue
+            if len(list2) > 2:
+                self.default_distance -= 1
+                continue
+            SEARCH = False
+        print("results at distance: {} (flipit={})".format(self.default_distance, flipit))
+
+        if self.default_distance > flipit:
+            return self.handful(img[::-1, ::-1], flipit=flipit+1)
+
+        print("".join(("{:3}: {}{}".format(n+1, idname(l)[:2], os.linesep) for n, l in enumerate(list1))))
+        return list1
 
 
 def mirror_cards():
@@ -390,9 +416,11 @@ def get_kpdesc(id, columns='ak_points,ak_desc'):
     c1, c2 = columns.split(',')
     try:
         line = orient_db.cur.execute("SELECT {}, {} FROM orient WHERE id=?".format(c1, c2), (id,)).fetchone()
+        assert(line[c1] is not None)
+        assert(line[c2] is not None)
     except Exception as e:
-        print("{} -- trouble fetching kp from orient: {} for {}, {}".format(id, c1, c2))
-        exit()
+        print("{} -- trouble fetching kp from orient: {} for {}, {}".format(e, id, c1, c2))
+        return [], None
     return [cv2.KeyPoint(x=a[0][0], y=a[0][1], _angle=a[1], _class_id=a[2], _octave=a[3], _response=a[4], _size=a[5])
             for a in line[c1]], np.loads(str(line[c2]))
 
@@ -434,29 +462,28 @@ def init_and_check():
         continue
 
 
+FLANN_INDEX_KDTREE = 1
+FLANN_INDEX_LSH = 6
+flann_pms = dict(algorithm=FLANN_INDEX_LSH,
+                 table_number=6, # 12
+                 key_size=12,     # 20
+                 multi_probe_level=1) #2
+
+
 def main():
     """
     user can play with generated data & images on local machine.
     """
     init_and_check()
-    a, b, c = getdcts()
-    simulate = Simile(a, b, c)
-    d, e, f = getdcts(only_faces=True)
-    #todo: subclass Simile instead of re-running getdcts()
-    smiles = Simile(d, e, f)
+    simulate = Simile(just_faces=False)
+    smiles = Simile(just_faces=True)
     default_distance = 15
     cap = cv2.VideoCapture(0)
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
     print("- Press <c> to capture & compare & then to clear all cards - ")
     print("- Press <f> to only use cards with detected 'faces' in them -")
     kazy = cv2.AKAZE_create()
-
-    FLANN_INDEX_KDTREE = 1
-    FLANN_INDEX_LSH    = 6
-    flann_params = dict(algorithm=FLANN_INDEX_LSH,
-                       table_number=6, # 12
-                       key_size=12,     # 20
-                       multi_probe_level=1) #2
+    flann_params = flann_pms
     flann = cv2.FlannBasedMatcher(flann_params, {})
     while True:
         ret, frame = cap.read()

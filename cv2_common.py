@@ -170,6 +170,7 @@ class RectSelector:
         self.drag_start = None
         self.drag_rect = None
     def onmouse(self, event, x, y, flags, param):
+        print("event={}".format(event))
         x, y = np.int16([x, y]) # BUG
         if event == cv2.EVENT_LBUTTONDOWN:
             self.drag_start = (x, y)
