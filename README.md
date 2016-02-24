@@ -38,17 +38,21 @@ get your command line to where you copied/cloned all the CardSnake files and typ
 
 >> python popu_pic_orient.py
 
-(stuff happens, data is acquired, pics downloaded for maybe 20 minutes)
+(stuff happens, data is acquired, pics downloaded & processed for maybe 30 minutes)
 
 next, type:
 
+>> python educator.py
+
+A camera view pops up. get out your Magic cards. Make sure the window is 'up front' in your gui
+
+press 'k' [k]ompare or 'c' to [c]lear or 'Esc' (to quit)
+
 >> python orientation.py
 
-A camera view pops up. press 'c' (capture) or 'f' (faces only) or 'Esc' (to quit) 
+Make funny faces into your web cam, press 'c' or 'f' What is most similar?
 
-Make funny faces into your web cam, or show it the art on a card. What is most similar?
-
-Update / check for new data by re-running 'popu_pic_orient.py'. 
+Update / check for new data, new card-sets by re-running 'popu_pic_orient.py'.
 It only updates what needs updating so it will be much faster now.
 
 Notice that you now have a local /CardSnake/pics/ sub-directory full of all the up to date card images (.jpg format). 
