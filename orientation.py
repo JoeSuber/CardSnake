@@ -317,8 +317,8 @@ class Simile(object):
 
     def hamm_ups(self, dct, cutval):
         """
-        dct: single mpz(uint64) to be compared against all the other values
-        cutval: the hamming distance threshold to filter the list with
+        dct: single mpz(uint64) to 'hamm' against all the other values
+        cutval: the hamming distance threshold with which to filter the array
 
         Returns
         -------
@@ -338,9 +338,8 @@ class Simile(object):
         """
         img: full image probably lifted from a user input device
         flipit: the hamming distance where it may be wise to try an inverted version of img to get closer results
-        powermotionsales
 
-        Returnskkkkk
+        Returns
         -------
         list1: a minimal list of ids-to-database-images with the closest hamming distance
         to the top or bottom of the input img dct.
@@ -465,9 +464,9 @@ def init_and_check():
 FLANN_INDEX_KDTREE = 1
 FLANN_INDEX_LSH = 6
 flann_pms = dict(algorithm=FLANN_INDEX_LSH,
-                 table_number=6, # 12
-                 key_size=12,     # 20
-                 multi_probe_level=1) #2
+                 table_number=6,            # 12
+                 key_size=12,               # 20
+                 multi_probe_level=1)       # 2
 
 
 def main():
@@ -541,7 +540,11 @@ def main():
                     allmn = flann.knnMatch(desc, cdesc, k=2)
                     filtered_m = []
                     if len(allmn) > 1:
-                        filtered_m = [[m] for m, n in allmn if m.distance < (0.75 * n.distance)]
+                        try:
+                            filtered_m = [[m] for m, n in allmn if m.distance < (0.75 * n.distance)]
+                        except ValueError:
+                            print("error unpacking...probably missing a paired DMatch object")
+                            filtered_m = []
                     if filtered_m:
                         imp = orient_db.cur.execute("SELECT picpath FROM orient WHERE id=(?)", (l,)).fetchone()
                         img2 = cv2.imread(os.path.join(peep.__mtgpics__, imp['picpath']))
@@ -561,5 +564,4 @@ def main():
         #bring_up()
 
 if __name__ == "__main__":
-
     exit(main())
