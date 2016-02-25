@@ -461,6 +461,7 @@ def init_and_check():
         continue
 
 
+"SELECT id, picpath FROM {} WHERE picpath IS NOT NULL and {} IS NULL"
 FLANN_INDEX_KDTREE = 1
 FLANN_INDEX_LSH = 6
 flann_pms = dict(algorithm=FLANN_INDEX_LSH,
@@ -472,6 +473,7 @@ flann_pms = dict(algorithm=FLANN_INDEX_LSH,
 def main():
     """
     user can play with generated data & images on local machine.
+    This is mostly obsolete. Try running 'educator.py'
     """
     init_and_check()
     simulate = Simile(just_faces=False)

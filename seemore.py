@@ -20,21 +20,13 @@ import time
 from hashlib import sha1
 
 
-def undertaker(db=orientation.orient_db, img_code='USER'):
-    """
-    remove from database the user-created items that don't have an actual picture on their given path
-    """
-    user_stuff = db.cur.execute("SELECT FROM ")
-
-
 def pic_adder(img, db=orientation.orient_db, img_dir=None, img_name=None, img_code='USER', img_format='.jpg',
               img_id=None, brothers=[]):
     """
     Allows for adding pics to card db even when they are completely without context... but
     keep as much context as is provided.
     Also, avoid file-name and hash collisions by assigning extra sequential numbers when required.
-    'brothers' is a list of id's that would have collided
-
+    'brothers' is by default a list of id's that would have collided if names weren't changed
     The new item still has to be processed by the startup routines to be incorporated into searches
     """
     if img_dir is None:
@@ -64,16 +56,16 @@ def pic_adder(img, db=orientation.orient_db, img_dir=None, img_name=None, img_co
     unique_path = os.sep.join(fullpath.split(os.sep)[-2:])
     cv2.imwrite(fullpath, img)
 
-    line = dict(id=img_id, code=img_dir, name=img_name, pic_path=unique_path, variations=brothers)
+    line = dict(id=img_id, code=img_code, name=img_name, pic_path=unique_path, variations=brothers)
     print("saved pic as: {}".format(fullpath))
     return db.add_data([line], 'cards', key_column='id')
 
 
 if __name__ == "__main__":
-    print("\n\nThis helps the user create pictures and data beyond the stock stuff.")
-    print("It has functions used by the other programs. Run educator.py and press [t]")
+    print("")
+    print("This helps the user create pictures and data beyond the stock stuff.")
+    print("It has functions used by the other programs. Run educator.py")
     print("with something of interest as your camera's target. ")
-    print("Then shutdown & run 'popu_pic_orient.py' to digest the new pictures")
-    print("into the database. Now you can find them with [k]")
-    print("like all the other stuff... hopefully.")
+    print("Then exit & run 'popu_pic_orient.py' to digest the new pictures")
+    print("into the database. Now your machine can recognize them if they have some texture. ;}")
     exit()

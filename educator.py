@@ -93,16 +93,20 @@ def card_adder(prospect_ids, matchmaker, db, currentcards, maxitems=5000):
     return matchmaker, currentcards
 
 
-ui = dict(g="[g]ive the new pics a base-name. Currently: '{}' ",
-          p="[p]rint verbose news about the matcher: {}{}bonus info! matcher has {} objects.",
-          t="[t]ake a picture: {} with {} errors",
-          k="[k]ompare the area in the green box with database items",
-          r="[r]un comparisons without pause on every frame: {}",
-          e="[e]rasing {} items from cardlist and matcher",
-          c="[c]leaning the windows",
-          d="[d]rawing Matches set to: {}",
-          esc="[esc]ape (exit) the program loop",
-          h="[h]elp - show these options")
+def undertaker(db=orientation.orient_db, path_front=orientation.peep.__mtgpics__, img_code='USER'):
+    """
+    remove from database the items (of a particular set-code) that don't have an actual picture
+    on their given path. Allows user to simply delete unwanted add-on pics from where they are
+    in the local file-system.
+    """
+    bad_user_stuff = [line['id'] for line in
+                     db.cur.execute("SELECT id, pic_path FROM cards WHERE code=?", (img_code,)).fetchall()
+                     if not os.path.isfile(os.path.join(path_front, line['pic_path']))]
+    print("user stuff without pictures: {}".format(len(bad_user_stuff)))
+    for tbl in db.tables:
+        db.cur.executemany("DELETE FROM {} WHERE id=?".format(tbl), ((b,) for b in bad_user_stuff))
+    db.con.commit()
+    return 1
 
 
 def main():
@@ -110,8 +114,8 @@ def main():
     yc, xc = (445, 312)     # typical pixels for a card
     cdx1, cdy1, cdx2, cdy2 = card_corners(camx, camy, yc, xc)
     MIN_MATCHES = 5
-    DRAW_MATCHES, RUN_FREE, PRINT_GOOD = True, True, False
-    MAX_ITEMS = 100
+    DRAW_MATCHES, RUN_FREE, PRINT_GOOD = True, False, False
+    MAX_ITEMS = 500
     cardlist = []
     user_given_name = None
     M2 = cv2.getRotationMatrix2D((xc/2, xc/2), -90, 1)
@@ -120,6 +124,17 @@ def main():
     looker = cv2.AKAZE_create()
     matcher = cv2.FlannBasedMatcher(orientation.flann_pms, {})
     cam = cv2.VideoCapture(0)
+    undertaker(img_code='USER')
+    ui = dict(g="[g]ive the new pics a base-name. Currently: '{}' ",
+                p="[p]rint verbose news about the matcher: {}{}bonus info! matcher has {} objects.",
+                t="[t]ake a picture: {} with {} errors",
+                k="[k]ompare the area in the green box with database items",
+                r="[r]un comparisons continuously, ie. on every frame: {}",
+                e="[e]rasing {} items from cardlist and matcher",
+                c="[c]lean up the windows",
+                d="[d]rawing Matches set to: {}",
+                esc="[esc]ape (exit) the program loop",
+                h="[h]elp - show these options")
     for vals in ui.viewvalues():
         print(vals)
     while True:
@@ -152,7 +167,7 @@ def main():
                     one_card = cardlist[indx]
                     if not DRAW_MATCHES:
                         cv2.imshow("{} {}".format(one_card.name, one_card.code),
-                               cv2.imread(os.path.join(pathfront, one_card.pic_path)))
+                                   cv2.imread(os.path.join(pathfront, one_card.pic_path)))
                         if PRINT_GOOD: print("good match: {} {} #{}"
                                              .format(cardlist[indx].name, cardlist[indx].code, len(matches)))
                     else:
@@ -176,6 +191,7 @@ def main():
             DRAW_MATCHES = not DRAW_MATCHES
             print(ui['d'].format(DRAW_MATCHES))
         if ch == ord('h'):
+            print("")
             for vals in ui.viewvalues():
                 print(vals)
         if ch == 27:
