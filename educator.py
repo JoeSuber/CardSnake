@@ -61,7 +61,7 @@ def card_compare(imgsamp, look, matchmaker, distance_ratio=0.82):
     kp, desc = look.detectAndCompute(imgsamp, None)
     if desc is None:
         print ("no descriptors")
-        return results
+        return [], {}
     try:
         for m0, m1 in matchmaker.knnMatch(desc, k=2):
             if m0.distance < (m1.distance * distance_ratio):
