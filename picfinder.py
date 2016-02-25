@@ -368,7 +368,7 @@ def main():
     peep.card_db.add_columns(peep.__cards_t__, __db_link__)
     peep.set_db.add_columns(peep.__sets_t__, __db_card_count__)
     #print peep.card_db.show_columns(peep.__cards_t__)
-    it = peep.card_db.cur.execute("SELECT * FROM cards").fetchall()
+    it = peep.card_db.cur.execute("SELECT id, name, pic_link FROM cards").fetchall()
 
     # for testing populate_links
     #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
@@ -384,7 +384,6 @@ def main():
         bad, remains = download_pics(attempt=trying, skip=baddies)
         if bad:
             baddies.append(bad)
-
 
     for bad in baddies:
         for i in it:
