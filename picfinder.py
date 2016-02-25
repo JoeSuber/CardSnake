@@ -152,6 +152,7 @@ def populate_links(setcodes):
         # each chunk of work is determined by the official setcode, but won't go without mci codes
         work = deque(peep.card_db.cur.execute(sql, (s,)).fetchall())
 
+        # remove the items with unwanted formats, like the huge cards etc.
         for x in xrange(len(work)):
             w = work.pop()
             if w['layout'] in oddities:
@@ -368,7 +369,7 @@ def main():
     peep.card_db.add_columns(peep.__cards_t__, __db_link__)
     peep.set_db.add_columns(peep.__sets_t__, __db_card_count__)
     #print peep.card_db.show_columns(peep.__cards_t__)
-    it = peep.card_db.cur.execute("SELECT id, name, pic_link FROM cards").fetchall()
+    it = peep.card_db.cur.execute("SELECT id, name, code, pic_link FROM cards").fetchall()
 
     # for testing populate_links
     #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")

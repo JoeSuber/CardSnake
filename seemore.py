@@ -20,6 +20,13 @@ import time
 from hashlib import sha1
 
 
+def undertaker(db=orientation.orient_db, img_code='USER'):
+    """
+    remove from database the user-created items that don't have an actual picture on their given path
+    """
+    user_stuff = db.cur.execute("SELECT FROM ")
+
+
 def pic_adder(img, db=orientation.orient_db, img_dir=None, img_name=None, img_code='USER', img_format='.jpg',
               img_id=None, brothers=[]):
     """
@@ -58,7 +65,7 @@ def pic_adder(img, db=orientation.orient_db, img_dir=None, img_name=None, img_co
     cv2.imwrite(fullpath, img)
 
     line = dict(id=img_id, code=img_dir, name=img_name, pic_path=unique_path, variations=brothers)
-
+    print("saved pic as: {}".format(fullpath))
     return db.add_data([line], 'cards', key_column='id')
 
 

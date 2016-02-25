@@ -48,7 +48,7 @@ def card_compare(imgsamp, look, matchmaker, distance_ratio=0.82):
     results = defaultdict(list)
     kp, desc = look.detectAndCompute(imgsamp, None)
     if desc is None:
-        print ("no descriptors")
+        #print ("no descriptors")
         return [], {}
     try:
         for m0, m1 in matchmaker.knnMatch(desc, k=2):
@@ -93,32 +93,55 @@ def card_adder(prospect_ids, matchmaker, db, currentcards, maxitems=5000):
     return matchmaker, currentcards
 
 
+ui = dict(g="[g]ive the new pics a base-name. Currently: '{}' ",
+          p="[p]rint verbose news about the matcher: {}{}bonus info! matcher has {} objects.",
+          t="[t]ake a picture: {} with {} errors",
+          k="[k]ompare the area in the green box with database items",
+          r="[r]un comparisons without pause on every frame: {}",
+          e="[e]rasing {} items from cardlist and matcher",
+          c="[c]leaning the windows",
+          d="[d]rawing Matches set to: {}",
+          esc="[esc]ape (exit) the program loop",
+          h="[h]elp - show these options")
+
+
 def main():
     camx, camy = 640, 480   # typical web-cam dimensions
     yc, xc = (445, 312)     # typical pixels for a card
     cdx1, cdy1, cdx2, cdy2 = card_corners(camx, camy, yc, xc)
     MIN_MATCHES = 5
-    DRAW_MATCHES = True
-    MAX_ITEMS = 5000
+    DRAW_MATCHES, RUN_FREE, PRINT_GOOD = True, True, False
+    MAX_ITEMS = 100
     cardlist = []
+    user_given_name = None
     M2 = cv2.getRotationMatrix2D((xc/2, xc/2), -90, 1)
     smile = orientation.Simile(just_faces=False)
     pathfront = orientation.peep.__mtgpics__
     looker = cv2.AKAZE_create()
     matcher = cv2.FlannBasedMatcher(orientation.flann_pms, {})
     cam = cv2.VideoCapture(0)
-    print("init done")
+    for vals in ui.viewvalues():
+        print(vals)
     while True:
         __, frame = cam.read()
         showimg = frame.copy()
         cv2.rectangle(showimg, (cdx1, cdy1), (cdx2, cdy2), (0, 255, 0))
         cv2.imshow("cam", showimg)
         ch = cv2.waitKey(1) & 0xff
+        if ch == ord('r'):
+            RUN_FREE = not RUN_FREE
+            print(ui['r'].format(RUN_FREE))
+        if ch == ord('g'):
+            print(ui['g'].format(user_given_name))
+            user_given_name = str(raw_input("type in the new pic base-name >>> ")).strip()
+        if ch == ord('p'):
+            PRINT_GOOD = not PRINT_GOOD
+            print(ui['p'].format(PRINT_GOOD, os.linesep, len(cardlist)))
         if ch == ord('t'):
             samp_img = cv2.warpAffine(frame[cdy1:cdy2, cdx1:cdx2], M2, (xc, yc))
-            quant, errors = seemore.pic_adder(samp_img)
-            print("[t]ake a picture: {} with {} errors".format(quant+1, errors))
-        if True:  # ch == ord('k')
+            quant, errors = seemore.pic_adder(samp_img, img_name=user_given_name)
+            print(ui['t'].format(quant+1, errors))
+        if RUN_FREE or (ch == ord('k')):
             samp_img = cv2.warpAffine(frame[cdy1:cdy2, cdx1:cdx2], M2, (xc, yc))
             matcher, cardlist = card_adder(smile.handful(samp_img), matcher, orientation.orient_db, cardlist,
                                            maxitems=MAX_ITEMS)
@@ -130,7 +153,8 @@ def main():
                     if not DRAW_MATCHES:
                         cv2.imshow("{} {}".format(one_card.name, one_card.code),
                                cv2.imread(os.path.join(pathfront, one_card.pic_path)))
-                        print("good match: {} {} #{}".format(cardlist[indx].name, cardlist[indx].code, len(matches)))
+                        if PRINT_GOOD: print("good match: {} {} #{}"
+                                             .format(cardlist[indx].name, cardlist[indx].code, len(matches)))
                     else:
                         cv2.imshow("{} {}".format(one_card.name, one_card.code),
                                    cv2.drawMatchesKnn(samp_img, current_kp,
@@ -138,20 +162,24 @@ def main():
                                                       one_card.kp, matches, outImg=np.zeros((yc, xc*2, 3),
                                                                                             dtype=np.uint8),
                                                       flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
-                        print("good match: {} {} #{}".format(cardlist[indx].name, cardlist[indx].code, len(matches)))
+                        if PRINT_GOOD: print("good match: {} {} #{}"
+                                             .format(cardlist[indx].name, cardlist[indx].code, len(matches)))
         if ch == ord('e'):
-            print("[e] erasing {} items from cardlist and matcher".format(len(cardlist)))
+            print(ui['e'].format(len(cardlist)))
             matcher.clear()
             cardlist = []
             ch = ord('c')
         if ch == ord('c'):
-            print("[c] cleaning the windows")
+            print(ui['c'])
             cv2.destroyAllWindows()
         if ch == ord('d'):
             DRAW_MATCHES = not DRAW_MATCHES
-            print("[d]rawing Matches set to: {}".format(DRAW_MATCHES))
+            print(ui['d'].format(DRAW_MATCHES))
+        if ch == ord('h'):
+            for vals in ui.viewvalues():
+                print(vals)
         if ch == 27:
-            print("<esc> leaving the program loop")
+            print(ui['esc'])
             cv2.destroyAllWindows()
             break
 
