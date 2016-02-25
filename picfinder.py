@@ -317,7 +317,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
         needed_links.append(w['pic_link'])
         new_dirs[os.path.join(fs_stub, w['code'] + tag)] += 1
 
-    # check that all filenames are unique
+    # check that all file-names are unique
     try:
         assert(len(set(needed_local_paths)) == len(needed_local_paths))
     except AssertionError:
@@ -389,7 +389,6 @@ def main():
         for i in it:
             if i['id'] == bad:
                 print("404, bad link: {} - {}".format(i['name'], i['pic_link']))
-
     return 1
 
 if __name__ == "__main__":

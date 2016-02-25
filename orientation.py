@@ -356,12 +356,12 @@ class Simile(object):
                 self.default_distance -= 1
                 continue
             SEARCH = False
-        print("results at distance: {} (flipit={})".format(self.default_distance, flipit))
+        #print("results at distance: {} (flipit={})".format(self.default_distance, flipit))
 
         if self.default_distance > flipit:
             return self.handful(img[::-1, ::-1], flipit=flipit+1)
 
-        print("".join(("{:3}: {}{}".format(n+1, idname(l)[:2], os.linesep) for n, l in enumerate(list1))))
+        #print("".join(("{:3}: {}{}".format(n+1, idname(l)[:2], os.linesep) for n, l in enumerate(list1))))
         return list1
 
 
