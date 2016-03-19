@@ -85,8 +85,11 @@ def prices(url):
     """
     returns the json-encoded version of the price info in an mtgprices.com spoiler-list page
     """
-    return json.loads(requests.get(url).content.split('$scope.setList =  ')[1].split(';')[0])
-
+    try:
+        return json.loads(requests.get(url).content.split('$scope.setList =  ')[1].split(';')[0])
+    except IndexError:
+        print("PROBLEM WITH DATA AT: {}".format(url))
+        return []
 
 def allprices(lmap, db=price_db):
     """
@@ -115,7 +118,7 @@ def price_check(cardname, cardset, foil=False, db=price_db,
 
 
 def main():
-    # allprices(correspondence())
+    allprices(correspondence())
     card = price_check('Dragon', '10E', foil=False)
     print card
 
