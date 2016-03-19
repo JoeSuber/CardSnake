@@ -10,7 +10,6 @@ Levenshtein distance is the last resort to try and get the match to a picture-li
 
 create local pic-path column in the cards database (if none)
 create card count column in sets db
-get a map of setcode: max_quantity for each set in sets db that doesn't have it
 load from db and check that pics paths are present and valid
 get the missing pics of cards downloaded to a local directory structure.
 record the paths in the database.

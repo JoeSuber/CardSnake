@@ -6,7 +6,7 @@ generate some dct data if needed. Use it to help determine the most similar imag
 
 run populate first, then picfinder, then run orientation and wait a few minutes while new dcts are added to database
 """
-from collections import defaultdict, Counter, deque
+from collections import defaultdict, Counter
 import gmpy2
 from gmpy2 import mpz
 from cv2_common import *
@@ -461,7 +461,6 @@ def init_and_check():
         continue
 
 
-"SELECT id, picpath FROM {} WHERE picpath IS NOT NULL and {} IS NULL"
 FLANN_INDEX_KDTREE = 1
 FLANN_INDEX_LSH = 6
 flann_pms = dict(algorithm=FLANN_INDEX_LSH,

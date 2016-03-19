@@ -2,7 +2,7 @@
 gmp2 may need the gnu-mpc c library installed before it will work
 grequests needs greenlet, which needs a c compiler to install itself
 cv2 is opencv - 2.4.x or 3.x - cv2.so or cv2.pyd should be placed in the 'site-packages' your python interp. is using
-numpy and python-Levenshein are also in need of a compiler for install
+numpy and python-Levenshein are also in need of a compiler for their self-install
 """
 
 from distutils.core import setup

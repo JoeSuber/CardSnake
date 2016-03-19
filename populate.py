@@ -17,7 +17,6 @@ import sqlite3
 import requests
 import grequests
 from collections import Counter
-from itertools import izip, repeat
 import time
 import sys
 reload(sys).setdefaultencoding("utf8")
@@ -142,8 +141,8 @@ class DBMagic (object):
         for n, line in enumerate(data):
             line_item = {k: v for k, v in line.viewitems() if k in approved_columns}
             SQL1 = '''INSERT OR IGNORE INTO {}({}) VALUES({})'''.format(str(tbl), ', '.join(line_item.keys()),
-                                                                          ':' + ', :'.join(line_item.keys()))
-            SQL2 = '''UPDATE {} SET {} WHERE changes()=0 and {}=('{}')'''\
+                                                                        ':' + ', :'.join(line_item.keys()))
+            SQL2 = '''UPDATE {} SET {} WHERE changes()=0 and {}=("{}")'''\
                 .format(str(tbl), ", ".join(map(hunk, line_item.keys())), key_column, line_item[key_column])
             try:
                 self.cur.execute(SQL1, line_item)
