@@ -119,7 +119,7 @@ def price_check(cardname, cardset, foil=False, db=price_db,
 
 def main():
     allprices(correspondence())
-    card = price_check('Dragon', '10E', foil=False)
+    card = price_check('D', '10E', foil=False)
     print card
 
 if __name__ == "__main__":
