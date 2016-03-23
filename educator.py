@@ -22,6 +22,7 @@ import numpy as np
 import orientation, seemore
 from collections import namedtuple, defaultdict
 import os
+from pricer import single_price
 
 
 Card = namedtuple('Card', 'name, code, id, pic_path, kp')
