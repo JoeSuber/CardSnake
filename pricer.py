@@ -1,4 +1,5 @@
-
+#!/usr/bin/env python -S
+# -*- coding: utf-8 -*-
 """
 get the price info for all cards from mtgprice.com and cache it into database
 1) get web-links-to-price-lists mapped to database set-codes
@@ -13,7 +14,7 @@ import requests
 from operator import itemgetter
 import json
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 
 
 price_db = pf.peep.DBMagic(DBfn=pf.peep.__sqlcards__,
@@ -64,10 +65,11 @@ def localsets(db=pf.peep.set_db, sql="SELECT code, name, mkm_name, releaseDate F
             for l in db.cur.execute(sql).fetchall()]
 
 
-def correspondence(strips=('_(Foil)')):
+def correspondence():
     """
-    Finds best match among local set-codes for each web-link to a set-pricelist
     external functions: localsets() and mtgdate_map() are used to supply data.
+
+    Returns: dict of {web-link to a set-pricelist: best match among local set-codes, ...}
     """
     locs = localsets()
     link_to_setcode = {}
@@ -88,8 +90,10 @@ def prices(url):
     try:
         return json.loads(requests.get(url).content.split('$scope.setList =  ')[1].split(';')[0])
     except IndexError:
+        # rarely the page data is missing even when requests returns something saying its okay
         print("PROBLEM WITH DATA AT: {}".format(url))
         return []
+
 
 def allprices(lmap, db=price_db):
     """
@@ -159,15 +163,15 @@ def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
     Side-Effects:
     -------
     attaches the price_db 'cardId' to the appropriate entries (new regular & foil columns) in the cards_db.
-    This will allow for faster and more accurate access to price data when the local 'id' of a card is used.
-    Also adds the date of the last price change/check in "seconds since the epoch" float style
+    This will allow for faster and more accurate access to price data by the local 'id' of a card.
+    Also adds the date of the last price change/check in "seconds since the epoch" float style.
     """
     columns = (u'cardId', u'name', u'isFoil')
     possibles = dbp.cur.execute("SELECT {} FROM prices WHERE set_code=?"
                                 .format(",".join(columns)), (cardset,)).fetchall()
     local_ids = {l['id']: l['name'] for l in
                  dbid.cur.execute("SELECT id, name FROM cards WHERE code=?", (cardset, )).fetchall()}
-    matchlevels = [1.99, 1.93, 1.88, 1.84, 1.813, 1.80, 1.79, 1.74, 1.70]
+    matchlevels = [1.99, 1.93, 1.88, 1.84, 1.813, 1.80, 1.79, 1.74, 1.695]
     leveltracker = {}
     pricelines = defaultdict(dict)
     date = time.mktime(time.localtime())
@@ -179,7 +183,10 @@ def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
         if DEBUG:
             print("{} local and {} possibles in {} before doing matchlevel: {}"
                   .format(len(local_ids), len(possibles), cardset, level))
+        if (not possibles) or (not local_ids):
+            break
         for idk, idname in local_ids.viewitems():
+
             regular_match, possibles = name_check(idname, possibles=possibles, foil=False)
             if not regular_match:
                 break
@@ -200,7 +207,7 @@ def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
             else:
                 possibles.append(foil_match[0])
 
-        # loop back over only the incomplete items on the next matchlevels step
+        # loop back over only the incomplete local items on the next matchlevels step
         local_ids = {idk: idname for idk, idname in local_ids.viewitems() if len(pricelines[idk]) < line_items_constant}
 
     # test it!
@@ -245,19 +252,14 @@ def single_price(local_id, foil=False, dbid=pf.peep.card_db, dbp=price_db, price
         column = 'regular_price_info'
     price_id = dbid.cur.execute("SELECT {}, last_update FROM cards WHERE id=?"
                                 .format(column), (local_id, )).fetchone()[0]
-    priceline = dbp.cur.execute("SELECT {} FROM prices WHERE cardId=?".format(price_columns), (price_id, )).fetchone()
-    print priceline
+    return dbp.cur.execute("SELECT {} FROM prices WHERE cardId=?".format(price_columns), (price_id, )).fetchone()
 
 
 def main(dbid=pf.peep.card_db, mainDEBUG=False):
-    for i in dbid.cur.execute("SELECT id, name FROM cards").fetchall():
-        print("name = {}".format(i['name']))
-        single_price(i['id'])
-        st = str(raw_input("[q] to quit >>>")).strip()
-        if st == "q":
-            break
-    exit(22)
+    # scrape the card prices and assign a local set code to each card-price-line
     allprices(correspondence())
+
+    # assign card-price-cardId to local json-card-data so that prices can be looked up quickly using 'id'
     big_data = []
     for s_code in [s[0] for s in pf.peep.set_db.cur.execute("SELECT code FROM set_infos").fetchall()]:
         old_len = len(big_data)

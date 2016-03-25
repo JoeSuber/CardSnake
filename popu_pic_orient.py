@@ -7,9 +7,11 @@ or images exist to be had from sources, getting them into the local fold as well
 import populate
 import picfinder
 import orientation
-
+import pricer
 
 populate.main()
 picfinder.main()
 orientation.init_and_check()
-print("creation, updates and orientation are finished")
+pricer.main()
+
+print("creation, updates, orientation and pricing are finished")

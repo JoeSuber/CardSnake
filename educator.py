@@ -1,29 +1,14 @@
 #!/usr/bin/env python -S
 # -*- coding: utf-8 -*-
-
 """
-2) test flann matcher capability to handle multiple sets of objects. Find the trade-offs that are acceptable between
-    the quantity of keypoints-per-object (ie probably between 30 - 600) and speed/capacity/accuracy of matcher.
-    Allow for testing different flann-parameters or even getting the auto-tune thing working.
-    a) key-points could be winnowed by strength or re-computed to a given max/min quantity per pic.
 
-3) in service to both above items, fix-up a bounding box, and a 'shutter-open-close' widget for the camera.
-    include rotations / flips to help in determining the orientation / affine transform (if needed) to find proper
-    sample from the image. Homography from key-points could be found and coded in to capture to allow convenient
-    physical camera offset.
-    Find out what the standard deviations, means and medians are for hamming distances when the subject is oriented
-    'right-side-up' vs 'upside-down' Build some efficient logic for orientation::Simile that tells this vital bit of
-    info given dct_hints..
-        a) Build some multiple-sample based recognition into database for the card back (based on input images).
-            Perhaps some 'hard-coded' dct_hint could be included in source-code for card backs
 """
 import cv2
 import numpy as np
 import orientation, seemore
 from collections import namedtuple, defaultdict
 import os
-from pricer import single_price
-
+import pricer
 
 Card = namedtuple('Card', 'name, code, id, pic_path, kp')
 
@@ -73,7 +58,7 @@ def card_adder(prospect_ids, matchmaker, db, currentcards, maxitems=5000):
     Returns
     -------
     matchmaker: the (bigger, maybe) matcher object
-    currentcards: now complete list of Card objects
+    currentcards: now complete list of Card objects in the same order as matchmaker indexes the descriptors
     """
     current_adds = set(prospect_ids) - set([c.id for c in currentcards])
 
@@ -84,7 +69,7 @@ def card_adder(prospect_ids, matchmaker, db, currentcards, maxitems=5000):
 
     for sid in current_adds:
         line = db.cur.execute("SELECT name, code, pic_path FROM cards WHERE id=(?)", (sid,)).fetchone()
-        kp, desc = orientation.get_kpdesc(sid, columns='ak_points,ak_desc')
+        kp, desc = orientation.get_kpdesc(sid, c1='ak_points', c2='ak_desc')
         if desc is None:
             print("database has no kp, descriptor entry for {}".format(orientation.idname(sid)))
             continue

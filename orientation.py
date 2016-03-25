@@ -153,7 +153,7 @@ def add_dct_data(cardpaths):
     """
     datas = []
     counter = 0
-    print("Calculating DCT data...")
+    print("Calculating DCT data for {} items...".format(len(cardpaths)))
     for idc, fsp in cardpaths.viewitems():
         #id, top_dct, picpath, face
         current_card = orient_db.cur.execute("SELECT id, top_dct FROM orient WHERE id=(?)", (idc,)).fetchone()
@@ -166,8 +166,8 @@ def add_dct_data(cardpaths):
             im = cv2.equalizeHist(cv2.imread(fsp, cv2.IMREAD_GRAYSCALE))
             height, width = im.shape[:2]
             datas.append({'id': idc, 'picpath': shortpath,
-                          'top_dct': gmpy2.digits(dct_hint(im[:width*__RAT__, :width])),
-                          'bot_dct': gmpy2.digits(dct_hint(im[height - width*__RAT__:height, :width]))})
+                          'top_dct': gmpy2.digits(dct_hint(im[:width * __RAT__, :width])),
+                          'bot_dct': gmpy2.digits(dct_hint(im[height - width * __RAT__: height, :width]))})
     print("{} new pics dct'd".format(counter))
     print("adding {} new lines of data to orient from {} card-paths".format(len(datas), len(cardpaths)))
     if datas:
@@ -370,7 +370,7 @@ def mirror_cards():
     see which items in card db need to be added to orient, then add them.
     """
     orient_db.cur.execute("""INSERT or IGNORE INTO orient(id, picpath)
-                              SELECT id, pic_path from cards WHERE pic_path IS NOT NULL""")
+                              SELECT id, pic_path FROM cards WHERE pic_path IS NOT NULL""")
     orient_db.con.commit()
     return 1
 
@@ -408,11 +408,10 @@ def akazer(pics=None, akaze=None, columns='ak_points,ak_desc'):
     return new_data
 
 
-def get_kpdesc(id, columns='ak_points,ak_desc'):
+def get_kpdesc(id, c1='ak_points', c2='ak_desc'):
     """
     retrieve and re-hydrate the key-point and descriptor data for a single card id
     """
-    c1, c2 = columns.split(',')
     try:
         line = orient_db.cur.execute("SELECT {}, {} FROM orient WHERE id=?".format(c1, c2), (id,)).fetchone()
         assert(line[c1] is not None)
