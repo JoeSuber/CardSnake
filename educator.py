@@ -89,10 +89,10 @@ def undertaker(db=orientation.orient_db, path_front=orientation.peep.__mtgpics__
                      db.cur.execute("SELECT id, pic_path FROM cards WHERE code=?", (img_code,)).fetchall()
                      if not os.path.isfile(os.path.join(path_front, line['pic_path']))]
     print("user stuff without pictures: {}".format(len(bad_user_stuff)))
-    for tbl in db.tables:
+    for tbl in ['orient', 'cards']:
         db.cur.executemany("DELETE FROM {} WHERE id=?".format(tbl), ((b,) for b in bad_user_stuff))
     db.con.commit()
-    return 1
+    return 11
 
 
 def main():
@@ -129,6 +129,8 @@ def main():
         cv2.rectangle(showimg, (cdx1, cdy1), (cdx2, cdy2), (0, 255, 0))
         cv2.imshow("cam", showimg)
         ch = cv2.waitKey(1) & 0xff
+        if ch != 255:
+            print ch
         if ch == ord('r'):
             RUN_FREE = not RUN_FREE
             print(ui['r'].format(RUN_FREE))
@@ -151,11 +153,14 @@ def main():
             for indx, matches in matchdict.viewitems():
                 if len(matches) > MIN_MATCHES:
                     one_card = cardlist[indx]
+                    pricestr = pricer.single_price(one_card.id)[0]
+                    if pricestr:
+                        pricestr = ", ".join(map(str, pricestr)[1:3])
                     if not DRAW_MATCHES:
                         cv2.imshow("{} {}".format(one_card.name, one_card.code),
                                    cv2.imread(os.path.join(pathfront, one_card.pic_path)))
-                        if PRINT_GOOD: print("good match: {} {} #{}"
-                                             .format(cardlist[indx].name, cardlist[indx].code, len(matches)))
+                        if PRINT_GOOD: print("good match: {} {}  (pnts:{})  prices: {}"
+                                             .format(cardlist[indx].name, cardlist[indx].code, len(matches), pricestr))
                     else:
                         cv2.imshow("{} {}".format(one_card.name, one_card.code),
                                    cv2.drawMatchesKnn(samp_img, current_kp,
@@ -163,9 +168,8 @@ def main():
                                                       one_card.kp, matches, outImg=np.zeros((yc, xc*2, 3),
                                                                                             dtype=np.uint8),
                                                       flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
-                        if PRINT_GOOD: print("good match: {} {} #{}  price: {}"
-                                             .format(cardlist[indx].name, cardlist[indx].code, len(matches),
-                                                     pricer.single_price(cardlist[indx].id)[0]))
+                        if PRINT_GOOD: print("good match: {} {} (pnts:{})  prices: {}"
+                                             .format(one_card.name, one_card.code, len(matches), pricestr))
         if ch == ord('e'):
             print(ui['e'].format(len(cardlist)))
             matcher.clear()
