@@ -16,6 +16,8 @@ import json
 import time
 from collections import defaultdict
 
+# how much time required between subsequent price scrapes:
+HOUR_DELAY = 2.0
 
 price_db = pf.peep.DBMagic(DBfn=pf.peep.__sqlcards__,
                            DBcolumns={'prices': pf.peep.createstr.format('prices', 'cardId')},
@@ -65,7 +67,7 @@ def localsets(db=pf.peep.set_db, sql="SELECT code, name, mkm_name, releaseDate F
             for l in db.cur.execute(sql).fetchall()]
 
 
-def recent_checked(unchecked_codes, current_time=None, hour_delay=6.0, db=pf.peep.card_db):
+def recent_checked(unchecked_codes, current_time=None, hour_delay=HOUR_DELAY, db=pf.peep.card_db):
     if 'last_update' not in db.show_columns('cards'):
         return unchecked_codes
     if current_time is None:
@@ -172,7 +174,7 @@ def set_has_foils(setcode, default_linelen=2, db=price_db):
                                                              (setcode, )).fetchall()]))
 
 
-def recently_checked(current_time, last_check, hours_to_ignore=6.0):
+def recently_checked(current_time, last_check, hours_to_ignore=HOUR_DELAY):
     """both times are in seconds-since-the-epoch float format"""
     return ((current_time - (last_check or 0))/3600.0) < hours_to_ignore
 
