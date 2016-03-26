@@ -65,6 +65,27 @@ def localsets(db=pf.peep.set_db, sql="SELECT code, name, mkm_name, releaseDate F
             for l in db.cur.execute(sql).fetchall()]
 
 
+def recent_checked(unchecked_codes, current_time=None, hour_delay=6.0, db=pf.peep.card_db):
+    if 'last_update' not in db.show_columns('cards'):
+        return unchecked_codes
+    if current_time is None:
+        current_time = time.time()
+    delay = hour_delay * 3600
+    checked_codes = {}
+    for kk, line in unchecked_codes.viewitems():
+        avg = delay + 1
+        c = line[0]
+        times = [current_time - t[0] for t in
+                 db.cur.execute("SELECT last_update FROM cards WHERE code=?", (c[0][0], )).fetchall() if t[0]]
+        if times:
+            avg = sum(times) / float(len(times))
+        if avg > delay:
+            checked_codes[kk] = line
+        else:
+            print("{} ({}) was checked within the last {} hours".format(c[0][1], c[0][0], hour_delay))
+    return checked_codes
+
+
 def correspondence():
     """
     external functions: localsets() and mtgdate_map() are used to supply data.
@@ -80,7 +101,7 @@ def correspondence():
                            int(str(year) == str(l[3].split('-')[0])))
                       for l in locs], key=itemgetter(1), reverse=True)
         link_to_setcode[lnk] = (best[0], foil)
-    return link_to_setcode
+    return recent_checked(link_to_setcode)
 
 
 def prices(url):
@@ -103,6 +124,7 @@ def allprices(lmap, db=price_db):
     """
     biglist = []
     for item_num, (link, info) in enumerate(lmap.viewitems()):
+
         pricelist = prices(link)
         for card in pricelist:
             card['set_code'] = info[0][0][0]
@@ -152,7 +174,7 @@ def set_has_foils(setcode, default_linelen=2, db=price_db):
 
 def recently_checked(current_time, last_check, hours_to_ignore=6.0):
     """both times are in seconds-since-the-epoch float format"""
-    return ((current_time - last_check)/360.0) < hours_to_ignore
+    return ((current_time - (last_check or 0))/3600.0) < hours_to_ignore
 
 
 def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
@@ -197,7 +219,7 @@ def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
         if (not possibles) or (not local_ids):
             break
         for idk, idname in local_ids.viewitems():
-
+            # plain card prices
             regular_match, possibles = name_check(idname, possibles=possibles, foil=False)
             if not regular_match:
                 break
@@ -207,7 +229,7 @@ def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
                     leveltracker[idk] = (level, regular_match[1])
             else:
                 possibles.append(regular_match[0])
-
+            # foil card prices
             foil_match, possibles = name_check(idname, possibles=possibles, foil=True)
             if not foil_match:
                 break
@@ -221,7 +243,7 @@ def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
         # loop back over only the incomplete local items on the next matchlevels step
         local_ids = {idk: idname for idk, idname in local_ids.viewitems() if len(pricelines[idk]) < line_items_constant}
 
-    # test it!
+    # test it!        if best[0][1] > 1.:
     if DEBUG:
         print("Only showing items below matchlevel = {}".format(matchlevels[1]))
         for kk, vv in pricelines.viewitems():
@@ -267,9 +289,6 @@ def single_price(local_id, foil=False, dbid=pf.peep.card_db, dbp=price_db, price
            price_id['last_update']
 
 
-def time_since(past):
-    now = time.ctime()
-
 def main(dbid=pf.peep.card_db, mainDEBUG=False):
     # scrape the card prices and assign a local set code to each card-price-line
     allprices(correspondence())
@@ -288,7 +307,9 @@ def main(dbid=pf.peep.card_db, mainDEBUG=False):
             if len(inq) == 3:
                 s_code = inq
         big_data.extend(multi_price(s_code, DEBUG=mainDEBUG))
-        print("set: {} had {} updated price-lines".format(s_code, len(big_data) - old_len))
+        update_size = len(big_data) - old_len
+        if update_size:
+            print("set: {} had {} updated price-lines".format(s_code, update_size))
 
     # add columns if needed, then add the data
     if big_data:

@@ -100,7 +100,7 @@ def main():
     yc, xc = (445, 312)     # typical pixels for a card
     cdx1, cdy1, cdx2, cdy2 = card_corners(camx, camy, yc, xc)
     MIN_MATCHES = 5
-    DRAW_MATCHES, RUN_FREE, PRINT_GOOD = True, False, False
+    DRAW_MATCHES, RUN_FREE, PRINT_GOOD = True, False, True
     MAX_ITEMS = 500
     cardlist = []
     user_given_name = None
@@ -163,8 +163,9 @@ def main():
                                                       one_card.kp, matches, outImg=np.zeros((yc, xc*2, 3),
                                                                                             dtype=np.uint8),
                                                       flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
-                        if PRINT_GOOD: print("good match: {} {} #{}"
-                                             .format(cardlist[indx].name, cardlist[indx].code, len(matches)))
+                        if PRINT_GOOD: print("good match: {} {} #{}  price: {}"
+                                             .format(cardlist[indx].name, cardlist[indx].code, len(matches),
+                                                     pricer.single_price(cardlist[indx].id)[0]))
         if ch == ord('e'):
             print(ui['e'].format(len(cardlist)))
             matcher.clear()
