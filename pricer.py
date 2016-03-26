@@ -150,6 +150,11 @@ def set_has_foils(setcode, default_linelen=2, db=price_db):
                                                              (setcode, )).fetchall()]))
 
 
+def recently_checked(current_time, last_check, hours_to_ignore=6.0):
+    """both times are in seconds-since-the-epoch float format"""
+    return ((current_time - last_check)/360.0) < hours_to_ignore
+
+
 def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
     """
     By doing the matching on a set-by-set basis and first winnowing down to the hard-to-match items, the overall results
@@ -169,16 +174,22 @@ def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
     columns = (u'cardId', u'name', u'isFoil')
     possibles = dbp.cur.execute("SELECT {} FROM prices WHERE set_code=?"
                                 .format(",".join(columns)), (cardset,)).fetchall()
-    local_ids = {l['id']: l['name'] for l in
-                 dbid.cur.execute("SELECT id, name FROM cards WHERE code=?", (cardset, )).fetchall()}
+    date = time.time()
+    if 'last_update' in dbid.show_columns('cards'):
+        local_ids = {l['id']: l['name'] for l in
+                     dbid.cur.execute("SELECT id, name, last_update FROM cards WHERE code=?", (cardset,)).fetchall()
+                     if not recently_checked(date, l['last_update'])}
+    else:
+        local_ids = {l['id']: l['name'] for l in
+                     dbid.cur.execute("SELECT id, name FROM cards WHERE code=?", (cardset, )).fetchall()}
+
     matchlevels = [1.99, 1.93, 1.88, 1.84, 1.813, 1.80, 1.79, 1.74, 1.695]
     leveltracker = {}
     pricelines = defaultdict(dict)
-    date = time.mktime(time.localtime())
     line_items_constant = set_has_foils(cardset)
     rk, fk, lup = 'regular_price_info', 'foil_price_info', 'last_update'
 
-    # first find the perfect matches, then proceed down the match level steps, winnowing the possibilities:
+    # first find the perfect name matches, then proceed down the match level steps, winnowing the possibilities:
     for level in matchlevels:
         if DEBUG:
             print("{} local and {} possibles in {} before doing matchlevel: {}"
@@ -251,9 +262,13 @@ def single_price(local_id, foil=False, dbid=pf.peep.card_db, dbp=price_db, price
     else:
         column = 'regular_price_info'
     price_id = dbid.cur.execute("SELECT {}, last_update FROM cards WHERE id=?"
-                                .format(column), (local_id, )).fetchone()[0]
-    return dbp.cur.execute("SELECT {} FROM prices WHERE cardId=?".format(price_columns), (price_id, )).fetchone()
+                                .format(column), (local_id, )).fetchone()
+    return dbp.cur.execute("SELECT {} FROM prices WHERE cardId=?".format(price_columns), (price_id[0], )).fetchone(), \
+           price_id['last_update']
 
+
+def time_since(past):
+    now = time.ctime()
 
 def main(dbid=pf.peep.card_db, mainDEBUG=False):
     # scrape the card prices and assign a local set code to each card-price-line
@@ -279,7 +294,6 @@ def main(dbid=pf.peep.card_db, mainDEBUG=False):
     if big_data:
         dbid.add_columns('cards', pf.peep.column_type_parser(big_data))
         dbid.add_data(big_data, 'cards', key_column='id')
-
 
 
 if __name__ == "__main__":
