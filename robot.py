@@ -42,7 +42,7 @@ class Robot(object):
             trans = instruction
 
         if self.con.isOpen():
-            self.con.write(trans)
+            self.con.write(trans + self.nl)
             time.sleep(sleep)
         else:
             print("could not send: {}".format(trans))
