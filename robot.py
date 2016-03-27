@@ -15,7 +15,6 @@ class Robot(object):
         self.con = ser.Serial(port=port, baudrate=baud, timeout=readtimer)
         self.nl = nl
         self.LOADING = LOAD
-
         self.do = {'pickup_pos': 'M280 S120 P0' + nl + ' G0 X1',
                    'drop_pos': 'G1 X45',
                    'fan_on': 'M106',
@@ -32,16 +31,15 @@ class Robot(object):
             print(": {}".format(l))
         self.con.write("G28 XZ" + self.nl)    # physically home X (arm) and Z (output bin) to zero positions
         time.sleep(.5)
-        self.con.write(self.do['drop_pos'] + self.nl + " " + self.do['servo_up'] + self.nl)  # move arm out to allow loading
+        self.con.write(self.do['drop_pos'] + self.nl + " " + self.do['servo_up'] + self.nl)  # arm out to allow loading
         if self.LOADING:
             print("LOADING hopper by default: must trigger Y-min to exit loading-mode")
 
-    def dothis(self, instruction, sleep=0.1):
+    def dothis(self, instruction, sleep=0.15):
         if instruction in self.do.keys():
             trans = self.do[instruction]
         else:
             trans = instruction
-
         if self.con.isOpen():
             self.con.write(trans + self.nl)
             time.sleep(sleep)
@@ -89,10 +87,19 @@ class Robot(object):
         # next push back up to be in "ready-to-run" position
         return self.raise_hopper()
 
+    def testbot(self, destination):
+        self.dothis("G0 Z"+str(int(destination))+self.nl)
+        start = float(self.xyz_pos()['Z'])
+        print("start p = {}".format(start))
+        p = start
+        while p <= start:
+            p = float(self.xyz_pos()['Z'])
+            print("p = {}".format(p))
+
 
 def main():
     robot = Robot()
-    retline = robot.dothis("pickup_pos")
+    retline = robot.testbot(20)
     print("ret: {}".format(retline))
     robot.con.close()
 
