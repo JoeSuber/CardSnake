@@ -25,13 +25,14 @@ class Robot(object):
                    'end_stop_status': 'M119',
                    'positions': 'M114'}
         time.sleep(0.2)
-        self.con.write("M115\n")    # M115 info string request
+        self.con.write("M115" + self.nl)    # M115 info string request
         time.sleep(0.5)
         print("serial port: {}   isOpen={}".format(self.con.getPort(), self.con.isOpen()))
         for l in self.con.read(size=self.con.inWaiting()).split(':'):
             print(": {}".format(l))
-        self.con.write("G28 XZ")    # physically home X (arm) and Z (output bin) to zero positions
-        self.con.write(self.do['drop_pos'] + self.nl + self.do['servo_up'])  # move arm out to allow loading
+        self.con.write("G28 XZ" + self.nl)    # physically home X (arm) and Z (output bin) to zero positions
+        time.sleep(.5)
+        self.con.write(self.do['drop_pos'] + self.nl + " " + self.do['servo_up'] + self.nl)  # move arm out to allow loading
         if self.LOADING:
             print("LOADING hopper by default: must trigger Y-min to exit loading-mode")
 
@@ -49,11 +50,14 @@ class Robot(object):
             print("connection to {} is not open".format(self.con.getPort))
         return self.con.read(size=self.con.inWaiting())
 
-    def card_carried(self, term="x_max: TRIGGERED"):
+    def card_carried(self, term='x_max: TRIGGERED'):
         return term in self.dothis('end_stop_status').split(self.nl)
 
     def xyz_pos(self):
-        return dict([tuple(c.split(':')) for c in self.dothis("positions").split(' Count')[0].split(' ')])
+        try:
+            return dict([tuple(c.split(':')) for c in self.dothis("positions").split(' Count')[0].split(' ')])
+        except ValueError:
+            return self.xyz_pos()
 
     def raise_hopper(self, nudge=1.55):
         sensor_triggered = self.card_carried(term="y_max: TRIGGERED")
