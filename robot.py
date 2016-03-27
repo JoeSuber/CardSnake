@@ -9,11 +9,14 @@ import time
 
 
 class Robot(object):
-    def __init__(self, baud='115200', port='/dev/ttyACM0', readtimer=0):
+    def __init__(self, baud='115200', port='/dev/ttyACM0', readtimer=0, nl='\n', LOAD=True):
         self.baud = baud
         self.port = port
         self.con = ser.Serial(port=port, baudrate=baud, timeout=readtimer)
-        self.do = {'pickup_pos': 'G1 X1',
+        self.nl = nl
+        self.LOADING = LOAD
+
+        self.do = {'pickup_pos': 'M280 S120 P0' + nl + ' G0 X1',
                    'drop_pos': 'G1 X45',
                    'fan_on': 'M106',
                    'fan_off': 'M107',
@@ -27,22 +30,60 @@ class Robot(object):
         print("serial port: {}   isOpen={}".format(self.con.getPort(), self.con.isOpen()))
         for l in self.con.read(size=self.con.inWaiting()).split(':'):
             print(": {}".format(l))
-        self.con.write("M119\n")    # M119 end stop status
-        self.con.write("G28 XZ")
+        self.con.write("G28 XZ")    # physically home X (arm) and Z (output bin) to zero positions
+        self.con.write(self.do['drop_pos'] + self.nl + self.do['servo_up'])  # move arm out to allow loading
+        if self.LOADING:
+            print("LOADING hopper by default: must trigger Y-min to exit loading-mode")
 
-    def dothis(self, instruction, newline='\n'):
+    def dothis(self, instruction, sleep=0.1):
         if instruction in self.do.keys():
             trans = self.do[instruction]
         else:
             trans = instruction
 
         if self.con.isOpen():
-            self.con.write(trans + newline)
-            time.sleep(0.1)
+            self.con.write(trans)
+            time.sleep(sleep)
         else:
             print("could not send: {}".format(trans))
             print("connection to {} is not open".format(self.con.getPort))
         return self.con.read(size=self.con.inWaiting())
+
+    def card_carried(self, term="x_max: TRIGGERED"):
+        return term in self.dothis('end_stop_status').split(self.nl)
+
+    def xyz_pos(self):
+        return dict([tuple(c.split(':')) for c in self.dothis("positions").split(' Count')[0].split(' ')])
+
+    def raise_hopper(self, nudge=1.55):
+        sensor_triggered = self.card_carried(term="y_max: TRIGGERED")
+        target = float(self.xyz_pos()['Y']) - nudge
+        if not sensor_triggered and (nudge > 0):
+            _ = self.dothis("G0 Y" + str(target))
+            return self.raise_hopper(nudge=(nudge - 0.4))
+        return self.dothis("G0 Y" + str(target))
+
+    def load_hopper(self, move=5.0, top="y_max: TRIGGERED", bottom="y_min: TRIGGERED"):
+        """ load cards until bottom switch is triggered, indicating max capacity, but only move
+        down while top proximity sensor is triggered. Set self.LOADING false when done"""
+        goal = float(self.xyz_pos()['Y'])
+        print("You are in loading mode! (must press hopper limit switch to exit)")
+        # first push down to keep sensor uncovered. break when limit switch is triggered
+        while self.LOADING:
+            endstops = self.dothis('end_stop_status').split(self.nl)
+            if bottom in endstops:
+                print("Maximum hopper position indicated")
+                self.LOADING = False
+                break
+            current = float(self.xyz_pos()['Y'])
+            if top in endstops:
+                goal = current + move
+            else:
+                goal = current
+            _ = self.dothis("G0 Y" + str(goal))
+
+        # next push back up to be in "ready-to-run" position
+        return self.raise_hopper()
 
 
 def main():
