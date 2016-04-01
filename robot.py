@@ -9,7 +9,8 @@ import time
 import os
 import cv2
 import numpy as np
-from collections import deque, defaultdict, namedtuple, OrderedDict
+from collections import defaultdict, namedtuple, OrderedDict
+from operator import itemgetter
 from cv2_common import Timer, draw_str
 import orientation
 import pricer
@@ -95,10 +96,10 @@ class Posts(object):
         self.xc = xc
         self.yc = yc
         # these hard-coded corner values are just starting points, and are adjustable
-        self.p1 = (517, 95)
+        self.p1 = (517, 101)
         self.p2 = (541, 368)
-        self.p3 = (134, 385)
-        self.p4 = (134, 95)
+        self.p3 = (136, 385)
+        self.p4 = (136, 101)
         self.lines = [2, 2, 2, 2]
         self.colors = [(0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 255, 255)]
         self.radii = [5, 5, 5, 5]
@@ -117,8 +118,8 @@ class Posts(object):
             saying = "Use Arrow Keys and Numbers (1-4) to adjust until warp is square"
             for pnt, r, c, ln in zip(self.pts1, self.radii, self.colors, self.lines):
                 cv2.circle(cam_img, tuple(pnt), r, c, thickness=ln)
-            for line, (label, pnt) in enumerate(zip(["p1", "p2", "p3", "p4"], self.pts1)):
-                draw_str(cam_img, (10, 40 + (line * 15)), " =".join([label, str(tuple(pnt))]))
+            for line, (label, pnt, hugh) in enumerate(zip(["p1", "p2", "p3", "p4"], self.pts1, self.colors)):
+                draw_str(cam_img, (10, 40 + (line * 15)), " =".join([label, str(tuple(pnt))]), hugh)
         else:
             saying = "Press [a] to turn corner-adjustment on/off."
         draw_str(cam_img, (20, 17), saying)
@@ -177,46 +178,58 @@ class Robot(object):
         time.sleep(0.5)
         self.con.write(self.do['drop_pos'] + self.nl + " " + self.do['servo_up'] + self.nl)  # arm out to allow loading
         self.con.write(self.do['fan_off'] + self.nl)
-        self.start = time.time()
+        self.NEED_DROP = False
+        self.SHOULD_RETURN = False
+        self.ID_DONE = False
+        self.PICKING_UP = False
+        self.bins = OrderedDict([('Low', 125), ('High', 247.5)])
+        self.bin_cuts = OrderedDict([('Low', 0.0), ('High', 0.5)])
+        self.bin_sliver = 0.2
 
     def dothis(self, instruction):
         if instruction in self.do.keys():
             self.con.write(self.do[instruction] + self.nl)
-            self.start = time.time()
             return self.times[instruction]
 
         self.con.write(instruction + self.nl)
-        self.start = time.time()
         return 0.0
 
+    def bin_lookup(self, price, binname='Low'):
+        for bk, bv in self.bin_cuts.viewitems():
+            if price >= bv:
+                binname = bk
+        return binname
+
     def sensor_tripped(self, term='x_max: TRIGGERED', ret_size=109):
-        wait = self.dothis('end_stop_status')
-        while (time.time() - self.start) < wait:
+        wait = self.dothis('end_stop_status') + time.time()
+        while time.time() < wait:
             if self.con.inWaiting() > ret_size:
                 #print("at {} seconds:".format(time.time() - self.start))
                 return term in self.con.read(size=self.con.inWaiting())
-        print("time expired (waited {} sec.) on call to sensor_tripped()".format(wait))
+        print("time expired on call to sensor_tripped()")
         return False
 
     def xyz_pos(self, ret_size=55):
         self.con.flushInput()
-        wait = self.dothis("positions")
-        while (time.time() - self.start) < wait:
+        wait = self.dothis("positions") + time.time()
+        while time.time() < wait:
             if self.con.inWaiting() > ret_size:
                 #print("at {} seconds:".format(time.time() - self.start))
                 #print(self.con.inWaiting())
                 return dict([tuple(c.split(':')) for c in self.con.read(size=self.con.inWaiting())
                             .split(' Count')[0].split(' ')])
-        print("time expired (waited {} sec.) on call to xyz_pos()".format(wait))
+        print("time expired on call to xyz_pos()")
         return {}
 
-    def go_z(self, newz, timeconst=0.039):
-        assert(isinstance(newz, float))
+    def go_z(self, bin_name, timeconst=0.041):
+        newz = float(self.bins[bin_name])
+        self.bins[bin_name] -= self.bin_sliver
         curz = float(self.xyz_pos()['Z'])
         x_spot = self.do['drop_pos'].split(' ')[1]
         x_time = self.times['drop_pos']
         z_time = abs(curz - newz) * timeconst
         self.dothis("G0 Z" + str(newz) + " " + x_spot + self.nl)
+        self.NEED_DROP = True
         return z_time if z_time > x_time else x_time
 
     def raise_hopper(self, nudge=1.55):
@@ -253,7 +266,7 @@ def main():
     cam = cv2.VideoCapture(0)
     time.sleep(6)
     wait = time.time()
-    low_bin, high_bin = 125, 245
+    bin = "Nada"
     while True:
         __, frame = cam.read()
         showimg = eyeball.draw_guides(frame.copy())
@@ -263,42 +276,52 @@ def main():
         ch = cv2.waitKey(1) & 0xff
         eyeball.check_key(ch)
         if ch == 27:
+            robot.dothis("fan_off")
             cv2.destroyAllWindows()
             break
-        if ch == ord('g'):
+        if ch == ord('g') and not robot.ID_DONE:
             matcher, cardlist = card_adder(smile.handful(warp), matcher, orientation.orient_db, cardlist,
                                        maxitems=MAX_ITEMS)
             current_kp, matchdict = card_compare(warp, looker, matcher)
-            for indx, matches in matchdict.viewitems():
-                if len(matches) > MIN_MATCHES:
-                    one_card = cardlist[indx]
-                    pricestr = ''
-                    priceline = pricer.single_price(one_card.id)[0]
-                    if priceline:
-                        pricestr = ", ".join(map(str, priceline)[1:3])
-                    cv2.imshow("{} {}".format(one_card.name, one_card.code),
-                                   cv2.drawMatchesKnn(warp, current_kp,
-                                                      cv2.imread(os.path.join(pathfront, one_card.pic_path)),
-                                                      one_card.kp, matches,
-                                                      outImg=np.zeros((eyeball.yc, eyeball.xc * 2, 3), dtype=np.uint8),
-                                                      flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
-                    if PRINT_GOOD: print("good match: {} {} (pnts:{})  prices: {}"
-                                         .format(one_card.name, one_card.code, len(matches), pricestr))
+            bestmatch = sorted([(indx, matches)
+                                for indx, matches in matchdict.viewitems() if len(matches) > MIN_MATCHES],
+                               key=lambda x: len(x), reverse=True)
+            for indx, matches in bestmatch:
+                one_card = cardlist[indx]
+                pricestr = 'None'
+                pricetag = 0
+                priceline = pricer.single_price(one_card.id)[0]
+                if priceline:
+                    pricetag = priceline[1]
+                    pricestr = ", ".join(map(str, priceline)[1:3])
+                robot.ID_DONE = True
+                bin = robot.bin_lookup(pricetag)
+                cv2.imshow("{} {}".format(one_card.name, one_card.code), cv2.drawMatchesKnn(warp, current_kp,
+                                                  cv2.imread(os.path.join(pathfront, one_card.pic_path)),
+                                                  one_card.kp, matches,
+                                                  outImg=np.zeros((eyeball.yc, eyeball.xc * 2, 3), dtype=np.uint8),
+                                                  flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
+                if PRINT_GOOD: print("good match: {} {} (pnts:{})  prices: {}"
+                                     .format(one_card.name, one_card.code, len(matches), pricestr))
+                break
         if ch == ord('f'):
             RUN_FAN = not RUN_FAN
             if RUN_FAN:
                 wait = robot.dothis('fan_on') + time.time()
             else:
                 wait = robot.dothis('fan_off') + time.time()
-        if ch == ord('r'):
-            if time.time() > wait:
-                wait = robot.dothis('pickup_pos') + time.time()
-        if ch == ord('d'):
-            if time.time() > wait:
-                wait = robot.go_z(high_bin) + time.time()
-        if ch == ord('t'):
-            print "manual time estimation:"
-            print(time.time() - wait)
+        if robot.ID_DONE and (not robot.PICKING_UP) and (time.time() > wait):
+            wait = robot.dothis("pickup_pos") + time.time()
+            robot.PICKING_UP = True
+        if robot.PICKING_UP and (not robot.NEED_DROP) and (time.time() > wait) and robot.sensor_tripped():
+            wait = robot.go_z(bin) + time.time()
+            bin = 'Nope'
+            robot.PICKING_UP = False
+            robot.NEED_DROP = True
+        if robot.NEED_DROP and (time.time() > wait):
+            wait = robot.dothis("servo_drop") + time.time()
+            robot.NEED_DROP = False
+            robot.ID_DONE = False
 
 
 if __name__ == "__main__":
