@@ -6,6 +6,7 @@ serial interface to g-code driven robot apparatus that takes pictures and moves 
 
 import serial as ser
 import time
+import os
 import cv2
 import numpy as np
 from collections import deque, defaultdict, namedtuple, OrderedDict
@@ -148,7 +149,7 @@ class Robot(object):
         self.nl = nl
         self.LOADING = LOAD
         self.do = {'pickup_pos': 'M280 S120 P0' + nl + ' G0 X1',
-                   'drop_pos': 'G1 X45',
+                   'drop_pos': 'G0 X45',
                    'fan_on': 'M106',
                    'fan_off': 'M107',
                    'servo_drop': 'M280 S57 P0',
@@ -156,56 +157,74 @@ class Robot(object):
                    'end_stop_status': 'M119',
                    'positions': 'M114',
                    'stop': 'M410'}
-        self.times = {'pickup_pos': 'M280 S120 P0' + nl + ' G0 X1',
-                      'drop_pos': 'G1 X45',
-                      'fan_on': 'M106',
-                      'fan_off': 'M107',
-                      'servo_drop': 'M280 S57 P0',
-                      'servo_up': 'M280 S120 P0',
-                      'end_stop_status': 'M119',
-                      'positions': 'M114',
-                      'stop': 'M410'}
+        self.times = {'pickup_pos': 2.0,
+                      'drop_pos': 2.0,
+                      'fan_on': 0.1,
+                      'fan_off': 0.1,
+                      'servo_drop': 0.6,
+                      'servo_up': 0.5,
+                      'end_stop_status': 0.02,
+                      'positions': 0.011,
+                      'stop': 0.02}
         self.BLOCKED = False
-        time.sleep(0.7)
+        time.sleep(0.4)
         self.con.write("M115" + self.nl)    # M115 info string request
-        time.sleep(0.7)
+        time.sleep(0.5)
         print("serial port: {}   isOpen={}".format(self.con.getPort(), self.con.isOpen()))
         for l in self.con.read(size=self.con.inWaiting()).split(':'):
             print(": {}".format(l))
         self.con.write("G28 XZ" + self.nl)    # physically home X (arm) and Z (output bin) to zero positions
-        time.sleep(.5)
+        time.sleep(0.5)
         self.con.write(self.do['drop_pos'] + self.nl + " " + self.do['servo_up'] + self.nl)  # arm out to allow loading
-        if self.LOADING:
-            print("LOADING: must trigger Y-min to exit loading-mode")
+        self.con.write(self.do['fan_off'] + self.nl)
+        self.start = time.time()
 
     def dothis(self, instruction):
         if instruction in self.do.keys():
-            trans = self.do[instruction]
-        else:
-            trans = instruction
-        if self.con.isOpen():
-            self.con.write(trans + self.nl)
+            self.con.write(self.do[instruction] + self.nl)
+            self.start = time.time()
+            return self.times[instruction]
 
-    def card_carried(self, term='x_max: TRIGGERED'):
-        return term in self.dothis('end_stop_status').split(self.nl)
+        self.con.write(instruction + self.nl)
+        self.start = time.time()
+        return 0.0
 
-    def xyz_pos(self):
-        self.dothis("positions")
-        try:
-            return dict([tuple(c.split(':')) for c in self.con.read(size=self.con.inWaiting())
-                        .split(' Count')[0].split(' ')])
-        except AttributeError:
-            time.sleep(.1)
-            return dict([tuple(c.split(':')) for c in self.con.read(size=self.con.inWaiting())
-                        .split(' Count')[0].split(' ')])
+    def sensor_tripped(self, term='x_max: TRIGGERED', ret_size=109):
+        wait = self.dothis('end_stop_status')
+        while (time.time() - self.start) < wait:
+            if self.con.inWaiting() > ret_size:
+                #print("at {} seconds:".format(time.time() - self.start))
+                return term in self.con.read(size=self.con.inWaiting())
+        print("time expired (waited {} sec.) on call to sensor_tripped()".format(wait))
+        return False
+
+    def xyz_pos(self, ret_size=55):
+        self.con.flushInput()
+        wait = self.dothis("positions")
+        while (time.time() - self.start) < wait:
+            if self.con.inWaiting() > ret_size:
+                #print("at {} seconds:".format(time.time() - self.start))
+                #print(self.con.inWaiting())
+                return dict([tuple(c.split(':')) for c in self.con.read(size=self.con.inWaiting())
+                            .split(' Count')[0].split(' ')])
+        print("time expired (waited {} sec.) on call to xyz_pos()".format(wait))
+        return {}
+
+    def go_z(self, newz, timeconst=0.039):
+        assert(isinstance(newz, float))
+        curz = float(self.xyz_pos()['Z'])
+        x_spot = self.do['drop_pos'].split(' ')[1]
+        x_time = self.times['drop_pos']
+        z_time = abs(curz - newz) * timeconst
+        self.dothis("G0 Z" + str(newz) + " " + x_spot + self.nl)
+        return z_time if z_time > x_time else x_time
 
     def raise_hopper(self, nudge=1.55):
-        sensor_triggered = self.card_carried(term="y_max: TRIGGERED")
+        sensor_triggered = self.sensor_tripped(term="y_max: TRIGGERED")
 
     def load_hopper(self, move=5.0, top="y_max: TRIGGERED", bottom="y_min: TRIGGERED"):
         """ load cards until bottom switch is triggered, indicating max capacity, but only move
         down while top proximity sensor is triggered. Set self.LOADING false when done"""
-
         return self.raise_hopper()
 
     def testbot(self, destination):
@@ -219,28 +238,12 @@ class Robot(object):
                 print(line, " ", c)
 
 
-def App():
-    """ loop and do events based on time.time() and returns from functions """
-    ON_HOLD = False
-    until = time.time()
-    steps = {"id_card": 0.1, "pickup_and_bin_move": 0, "raise": 0, "check_on_board": 0,
-             "drop_move": 0, "check_drop": 0, "open_air": 0}
-    steploop = deque(steps.keys())
-    step = steploop.pop()
-
-    while steploop:
-        if (now < until) and not ON_HOLD:
-            ON_HOLD = True
-            now = time.time()
-            until = now + steps[step]
-
-
 def main():
     robot = Robot()
     eyeball = Posts()
-    MIN_MATCHES = 5
-    DRAW_MATCHES, RUN_FREE, PRINT_GOOD = True, False, True
-    MAX_ITEMS = 500
+    MIN_MATCHES = 15
+    DRAW_MATCHES, RUN_FAN, PRINT_GOOD = True, False, True
+    MAX_ITEMS = 600
     cardlist = []
     user_given_name = None
     smile = orientation.Simile(just_faces=False)
@@ -248,7 +251,9 @@ def main():
     looker = cv2.AKAZE_create()
     matcher = cv2.FlannBasedMatcher(orientation.flann_pms, {})
     cam = cv2.VideoCapture(0)
-    time.sleep(9)
+    time.sleep(6)
+    wait = time.time()
+    low_bin, high_bin = 125, 245
     while True:
         __, frame = cam.read()
         showimg = eyeball.draw_guides(frame.copy())
@@ -260,8 +265,40 @@ def main():
         if ch == 27:
             cv2.destroyAllWindows()
             break
-
-
+        if ch == ord('g'):
+            matcher, cardlist = card_adder(smile.handful(warp), matcher, orientation.orient_db, cardlist,
+                                       maxitems=MAX_ITEMS)
+            current_kp, matchdict = card_compare(warp, looker, matcher)
+            for indx, matches in matchdict.viewitems():
+                if len(matches) > MIN_MATCHES:
+                    one_card = cardlist[indx]
+                    pricestr = ''
+                    priceline = pricer.single_price(one_card.id)[0]
+                    if priceline:
+                        pricestr = ", ".join(map(str, priceline)[1:3])
+                    cv2.imshow("{} {}".format(one_card.name, one_card.code),
+                                   cv2.drawMatchesKnn(warp, current_kp,
+                                                      cv2.imread(os.path.join(pathfront, one_card.pic_path)),
+                                                      one_card.kp, matches,
+                                                      outImg=np.zeros((eyeball.yc, eyeball.xc * 2, 3), dtype=np.uint8),
+                                                      flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
+                    if PRINT_GOOD: print("good match: {} {} (pnts:{})  prices: {}"
+                                         .format(one_card.name, one_card.code, len(matches), pricestr))
+        if ch == ord('f'):
+            RUN_FAN = not RUN_FAN
+            if RUN_FAN:
+                wait = robot.dothis('fan_on') + time.time()
+            else:
+                wait = robot.dothis('fan_off') + time.time()
+        if ch == ord('r'):
+            if time.time() > wait:
+                wait = robot.dothis('pickup_pos') + time.time()
+        if ch == ord('d'):
+            if time.time() > wait:
+                wait = robot.go_z(high_bin) + time.time()
+        if ch == ord('t'):
+            print "manual time estimation:"
+            print(time.time() - wait)
 
 
 if __name__ == "__main__":
