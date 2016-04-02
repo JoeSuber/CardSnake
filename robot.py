@@ -157,16 +157,19 @@ class Robot(object):
                    'servo_up': 'M280 S120 P0',
                    'end_stop_status': 'M119',
                    'positions': 'M114',
-                   'stop': 'M410'}
-        self.times = {'pickup_pos': 2.0,
-                      'drop_pos': 2.0,
+                   'stop': 'M410',
+                   'raise_hopper': 'G92 Y3' + nl + ' G1 Y0'}
+        self.times = {'pickup_pos': 2.7,
+                      'drop_pos': 2.6,
+
                       'fan_on': 0.1,
                       'fan_off': 0.1,
                       'servo_drop': 0.6,
                       'servo_up': 0.5,
                       'end_stop_status': 0.02,
                       'positions': 0.011,
-                      'stop': 0.02}
+                      'stop': 0.02,
+                      'raise_hopper': 0.0}
         self.BLOCKED = False
         time.sleep(0.4)
         self.con.write("M115" + self.nl)    # M115 info string request
@@ -204,7 +207,6 @@ class Robot(object):
         wait = self.dothis('end_stop_status') + time.time()
         while time.time() < wait:
             if self.con.inWaiting() > ret_size:
-                #print("at {} seconds:".format(time.time() - self.start))
                 return term in self.con.read(size=self.con.inWaiting())
         print("time expired on call to sensor_tripped()")
         return False
@@ -214,10 +216,14 @@ class Robot(object):
         wait = self.dothis("positions") + time.time()
         while time.time() < wait:
             if self.con.inWaiting() > ret_size:
-                #print("at {} seconds:".format(time.time() - self.start))
-                #print(self.con.inWaiting())
-                return dict([tuple(c.split(':')) for c in self.con.read(size=self.con.inWaiting())
-                            .split(' Count')[0].split(' ')])
+                dd = {}
+                for c in self.con.read(size=self.con.inWaiting()).split(' Count')[0].split(' '):
+                    d = c.replace('ok', '').replace('\n', '').replace('n', '')
+                    if ':' in d:
+                        a, b = d.split(':')
+                        dd[a.strip()] = b.strip()
+                print dd
+                return dd
         print("time expired on call to xyz_pos()")
         return {}
 
@@ -228,27 +234,13 @@ class Robot(object):
         x_spot = self.do['drop_pos'].split(' ')[1]
         x_time = self.times['drop_pos']
         z_time = abs(curz - newz) * timeconst
-        self.dothis("G0 Z" + str(newz) + " " + x_spot + self.nl)
-        self.NEED_DROP = True
+        self.dothis("G1 Z" + str(newz) + " " + x_spot + self.nl)
         return z_time if z_time > x_time else x_time
-
-    def raise_hopper(self, nudge=1.55):
-        sensor_triggered = self.sensor_tripped(term="y_max: TRIGGERED")
 
     def load_hopper(self, move=5.0, top="y_max: TRIGGERED", bottom="y_min: TRIGGERED"):
         """ load cards until bottom switch is triggered, indicating max capacity, but only move
         down while top proximity sensor is triggered. Set self.LOADING false when done"""
         return self.raise_hopper()
-
-    def testbot(self, destination):
-        self.dothis("G0 Z"+str(int(destination))+self.nl)
-        size, c = 0, 0
-        while not size:
-            size = self.con.inWaiting()
-            c += 1
-            if size:
-                line = self.con.read(size=self.con.inWaiting())
-                print(line, " ", c)
 
 
 def main():
@@ -258,7 +250,6 @@ def main():
     DRAW_MATCHES, RUN_FAN, PRINT_GOOD = True, False, True
     MAX_ITEMS = 600
     cardlist = []
-    user_given_name = None
     smile = orientation.Simile(just_faces=False)
     pathfront = orientation.peep.__mtgpics__
     looker = cv2.AKAZE_create()
@@ -267,6 +258,7 @@ def main():
     time.sleep(6)
     wait = time.time()
     bin = "Nada"
+    OLD_YMIN = False
     while True:
         __, frame = cam.read()
         showimg = eyeball.draw_guides(frame.copy())
@@ -280,6 +272,7 @@ def main():
             cv2.destroyAllWindows()
             break
         if ch == ord('g') and not robot.ID_DONE:
+            print ("[g] pressed")
             matcher, cardlist = card_adder(smile.handful(warp), matcher, orientation.orient_db, cardlist,
                                        maxitems=MAX_ITEMS)
             current_kp, matchdict = card_compare(warp, looker, matcher)
@@ -315,13 +308,18 @@ def main():
             robot.PICKING_UP = True
         if robot.PICKING_UP and (not robot.NEED_DROP) and (time.time() > wait) and robot.sensor_tripped():
             wait = robot.go_z(bin) + time.time()
-            bin = 'Nope'
             robot.PICKING_UP = False
+            robot.ID_DONE = False
             robot.NEED_DROP = True
         if robot.NEED_DROP and (time.time() > wait):
             wait = robot.dothis("servo_drop") + time.time()
             robot.NEED_DROP = False
-            robot.ID_DONE = False
+        YMIN = robot.sensor_tripped(term='y_min: TRIGGERED')
+        if OLD_YMIN != YMIN:
+            OLD_YMIN = YMIN
+            if YMIN:
+                robot.dothis("raise_hopper")
+
 
 
 if __name__ == "__main__":
