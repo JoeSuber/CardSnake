@@ -87,7 +87,7 @@ def card_adder(prospect_ids, matchmaker, db, currentcards, maxitems=5000):
 
 class Posts(object):
     """
-    provides visualization and allows user to warp the camera image into perfect alignment with
+    provides visualization and allows user to warp the a sub-section of the camera image into alignment with
     an 'ideal' image to be used in the card-id process.
     """
     def __init__(self, camx=640, camy=480, yc=445, xc=312):
@@ -161,7 +161,6 @@ class Robot(object):
                    'raise_hopper': 'G92 Y3' + nl + ' G1 Y0'}
         self.times = {'pickup_pos': 2.7,
                       'drop_pos': 2.6,
-
                       'fan_on': 0.1,
                       'fan_off': 0.1,
                       'servo_drop': 0.6,
@@ -177,7 +176,8 @@ class Robot(object):
         print("serial port: {}   isOpen={}".format(self.con.getPort(), self.con.isOpen()))
         for l in self.con.read(size=self.con.inWaiting()).split(':'):
             print(": {}".format(l))
-        self.con.write("G28 XZ" + self.nl)    # physically home X (arm) and Z (output bin) to zero positions
+        # physically home X (arm) Y (hopper) and Z (output bin) to zero positions
+        self.con.write("G28 XYZ" + self.nl)
         time.sleep(0.5)
         self.con.write(self.do['drop_pos'] + self.nl + " " + self.do['servo_up'] + self.nl)  # arm out to allow loading
         self.con.write(self.do['fan_off'] + self.nl)
@@ -188,6 +188,7 @@ class Robot(object):
         self.bins = OrderedDict([('Low', 125), ('High', 247.5)])
         self.bin_cuts = OrderedDict([('Low', 0.0), ('High', 0.5)])
         self.bin_sliver = 0.2
+        self.con.flush()
 
     def dothis(self, instruction):
         if instruction in self.do.keys():
@@ -319,7 +320,6 @@ def main():
             OLD_YMIN = YMIN
             if YMIN:
                 robot.dothis("raise_hopper")
-
 
 
 if __name__ == "__main__":
