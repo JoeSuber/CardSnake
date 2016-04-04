@@ -125,6 +125,17 @@ class Posts(object):
         draw_str(cam_img, (20, 17), saying)
         return cam_img
 
+    def show_card_info(self, texts, chalkboard, max_expansion=2.5, topleft=(5, 5)):
+        """ take a list of text lines and draw each so it fits in most of the width of the given image"""
+        startx, starty = topleft
+        max_x = chalkboard.shape[1] - startx * 2
+        for txt in texts:
+            sx, sy = cv2.getTextSize(txt, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1, thickness=2)
+            size_ratio = min(max_x / sx, max_expansion)
+            starty += (int(sy * size_ratio) + 2)
+            draw_str(chalkboard, (startx, starty), txt, font=cv2.FONT_HERSHEY_PLAIN, size=size_ratio, color=(0, 255, 0))
+        return chalkboard
+
     def get_warp(self, whole_img):
         return cv2.warpPerspective(whole_img, self.M2, (self.xc, self.yc))
 
@@ -166,26 +177,32 @@ class Robot(object):
                       'fan_on': 0.1,
                       'fan_off': 0.1,
                       'servo_drop': 0.6,
-                      'servo_up': 0.5,
+                      'servo_up': 1.5,
                       'end_stop_status': 0.06,
                       'positions': 0.06,
                       'stop': 0.02}
         self.BLOCKED = False
         time.sleep(0.4)
-        self.con.write("M115" + self.nl)    # M115 info string request
+
+        # M115 info string request
+        self.con.write("M115" + self.nl)
         time.sleep(0.5)
         print("serial port: {}   isOpen={}".format(self.con.getPort(), self.con.isOpen()))
+
         # physically home X (arm) Y (hopper) and Z (output bin) to zero positions
         self.con.write("G28 XZ" + nl)
         self.con.write("G28 Y" + nl)
         time.sleep(0.5)
-        # arm out to allow loading
+
+        # arm 'X' swing out to allow loading of hopper
         self.con.write(self.do['drop_pos'] + nl + " " + self.do['servo_up'] + nl)
         self.con.write(self.do['fan_off'] + nl)
         self.NEED_DROP = False
         self.SHOULD_RETURN = False
         self.ID_DONE = False
         self.PICKING_UP = False
+
+        # adjust sort categories quantity and bin position here:
         self.bins = OrderedDict([('Low', 125), ('High', 247.5)])
         self.bin_cuts = OrderedDict([('Low', 0.0), ('High', 0.5)])
         self.bin_sliver = 0.2
@@ -200,7 +217,6 @@ class Robot(object):
         if instruction in self.do.keys():
             self.con.write(self.do[instruction] + self.nl)
             return self.times[instruction]
-
         self.con.write(instruction + self.nl)
         return 0.0
 
@@ -255,7 +271,7 @@ class Robot(object):
         self.dothis("G1 Z" + str(newz) + " " + x_spot)
         return z_time if z_time > self.times['drop_pos'] else self.times['drop_pos']
 
-    def hopper_up(self, y_current=None, bite=1.5, timeconst=0.5):
+    def hopper_up(self, y_current=None, bite=1.1, timeconst=0.5):
         """ raise the input hopper by a little bit, return the seconds it is estimated to take"""
         if y_current is None:
             try:
@@ -335,8 +351,8 @@ def main():
     robot = Robot()
     eyeball = Posts()
     MIN_MATCHES = 15
-    DRAW_MATCHES, RUN_FAN, PRINT_GOOD = True, False, True
     MAX_ITEMS = 600
+    RUN_FAN = False
     cardlist = []
     smile = orientation.Simile(just_faces=False)
     pathfront = orientation.peep.__mtgpics__
@@ -345,10 +361,10 @@ def main():
     cam = cv2.VideoCapture(0)
     time.sleep(6)
     wait = time.time()
-    bin = "Nada"
-    OLD_YMIN = False
-    time.sleep(0.5)
     robot.load_hopper()
+    bin = robot.bin_lookup(0.0)
+    old_window = ""
+    id_failure_cnt = 0
     while True:
         __, frame = cam.read()
         showimg = eyeball.draw_guides(frame.copy())
@@ -373,6 +389,11 @@ def main():
             current_kp, matchdict = card_compare(warp, looker, matcher)
             bestmatch = sorted([(i, matches) for i, matches in matchdict.viewitems() if len(matches) > MIN_MATCHES],
                                key=lambda x: len(x[1]), reverse=True)
+            if not bestmatch:
+                id_failure_cnt += 1
+                print("No luck: {} fails".format(id_failure_cnt))
+            if len(bestmatch) > 1:
+                print("Has {} candidates".format(len(bestmatch)))
             for indx, matches in bestmatch:
                 one_card = cardlist[indx]
                 pricestr = 'None'
@@ -380,23 +401,30 @@ def main():
                 priceline = pricer.single_price(one_card.id)[0]
                 if priceline:
                     pricetag = priceline[1]
-                    pricestr = ", ".join(map(str, priceline)[1:3])
+                    pricestr = "$" + " ,$".join(map(str, priceline)[1:3])
                 robot.ID_DONE = True
                 bin = robot.bin_lookup(pricetag)
-                cv2.imshow("{} {}".format(one_card.name, one_card.code), cv2.drawMatchesKnn(warp, current_kp,
+                new_window = "{} {} | {}".format(one_card.name, one_card.code, pricestr)
+                warp = eyeball.show_card_info(new_window.split(" | "), warp, max_expansion=2.5, topleft=(5, 5))
+                cv2.imshow(new_window, cv2.drawMatchesKnn(warp, current_kp,
                                                 cv2.imread(os.path.join(pathfront, one_card.pic_path)),
                                                   one_card.kp, matches,
                                                   outImg=np.zeros((eyeball.yc, eyeball.xc * 2, 3), dtype=np.uint8),
                                                   flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS))
-                if PRINT_GOOD: print("good match: {} {} (pnts:{})  prices: {}"
-                                     .format(one_card.name, one_card.code, len(matches), pricestr))
+                if old_window:
+                    cv2.destroyWindow(old_window)
+                old_window = new_window
+                id_failure_cnt = 0
                 break
+
         if ch == ord('f'):
             RUN_FAN = not RUN_FAN
             if RUN_FAN:
                 wait = robot.dothis('fan_on') + time.time()
             else:
                 wait = robot.dothis('fan_off') + time.time()
+
+        # goal of this convoluted logic is to allow camera to ID cards concurrent with moves & sensor checks
         if robot.ID_DONE and (not robot.PICKING_UP) and (time.time() > wait):
             wait = robot.dothis("pickup_pos") + time.time()
             robot.PICKING_UP = True
@@ -404,12 +432,22 @@ def main():
             wait = robot.dothis("servo_up") + time.time()
             wait += robot.go_z(bin)
             robot.PICKING_UP = False
-            robot.ID_DONE = False
             robot.NEED_DROP = True
         if robot.NEED_DROP and (time.time() > wait):
+            sens = robot.sensor_stats()
+            while 'x_max' not in sens.keys():
+                time.sleep(0.3)
+                print("Had to wait for sensor data before card-drop")
+                sens = robot.sensor_stats()
+            if "TRIG" in sens['x_max']:
+                #todo: record card bin position in database
+                lift = 0.22
+            else:
+                lift = 0.6
+            robot.hopper_up(bite=lift)
             wait = robot.dothis("servo_drop") + time.time()
-            robot.hopper_up(bite=0.4)
             robot.NEED_DROP = False
+            robot.ID_DONE = False
 
 
 if __name__ == "__main__":
