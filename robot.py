@@ -389,7 +389,7 @@ def main():
             print("i'm [e] pressed!")
             ee = smile.updown(warp)
             print("DIST:   vs UP:    vs DOWN:")
-            for q in sorted([ee.keys()]):
+            for q in sorted(ee.keys()):
                 print("{:6} - {:6}  - {:6}".format(q, ee[q][0], ee[q][1]))
         if ch == ord('g') and not robot.ID_DONE:
             matcher, cardlist = card_adder(smile.handful(warp), matcher, orientation.orient_db, cardlist,
