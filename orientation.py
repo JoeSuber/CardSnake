@@ -271,11 +271,11 @@ class Simile(object):
         #print("".join(("{:3}: {}{}".format(n+1, idname(l)[:2], os.linesep) for n, l in enumerate(list1))))
         return list1
 
-    def updown(self, img, rng=(4, 18)):
+    def updown(self, img, rng=(4, 19)):
         """ for testing different efficient ways of telling up from down """
         d = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[0:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         dd = {}
-        for dist in xrange(rng):
+        for dist in xrange(rng[0], rng[1]):
             dd[dist] = (len(self.hamm_ups(d, dist)), len(self.hamm_down(d, dist)))
         return dd
 
