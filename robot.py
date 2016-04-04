@@ -372,6 +372,7 @@ def main():
         __, frame = cam.read()
         showimg = eyeball.draw_guides(frame.copy())
         warp = eyeball.get_warp(frame)
+        cv2.imshow("flip", warp[::-1, ::-1])
         cv2.imshow("warp", warp)
         cv2.imshow("cam", showimg)
         ch = cv2.waitKey(1) & 0xff

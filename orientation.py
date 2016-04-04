@@ -122,10 +122,11 @@ def add_dct_data(cardpaths):
                 print("{} new pics dct'd".format(counter))
             shortpath = os.path.sep.join(fsp.split(os.path.sep)[-2:])
             im = cv2.equalizeHist(cv2.imread(fsp, cv2.IMREAD_GRAYSCALE))
+            flim = im[::-1, ::-1]
             height, width = im.shape[:2]
             datas.append({'id': idc, 'picpath': shortpath,
-                          'top_dct': gmpy2.digits(dct_hint(im[:width * __RAT__, :width])),
-                          'bot_dct': gmpy2.digits(dct_hint(im[height - width * __RAT__: height, :width]))})
+                          'top_dct': gmpy2.digits(dct_hint(im[:width * __RAT__, :])),
+                          'bot_dct': gmpy2.digits(dct_hint(flim[:width * __RAT__, :]))})
     print("{} new pics dct'd".format(counter))
     print("adding {} new lines of data to orient from {} card-paths".format(len(datas), len(cardpaths)))
     if datas:
@@ -251,7 +252,7 @@ class Simile(object):
         list1: a minimal list of ids-to-database-images with the closest hamming distance
         to the top or bottom of the input img dct.
         """
-        d = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[0:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+        d = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         SEARCH = True
         while SEARCH:
             list1 = self.hamm_ups(d, self.default_distance)
@@ -273,7 +274,7 @@ class Simile(object):
 
     def updown(self, img, rng=(4, 19)):
         """ for testing different efficient ways of telling up from down """
-        d = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[0:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+        d = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         dd = {}
         for dist in xrange(rng[0], rng[1]):
             dd[dist] = (len(self.hamm_ups(d, dist)), len(self.hamm_down(d, dist)))
