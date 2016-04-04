@@ -2,13 +2,13 @@
 """
 populate.py is run to initially create and then keep updated a local sqlite database from the .json files
 maintained at mtgjson.com. It can do this for any .json files, I think, parsing list and dict
-data-types as well as strings and ints.
+data-types as well as normal strings and ints.
 
-The updates only update what the json file says has changed after the initial run, so should be pretty low overhead
+The scraping only updates what the json file says has changed after the initial run, so should be pretty low overhead
 
 uses: http://mtgjson.com/json/changelog.json to update card db entries that have changed using the SET updater
 
-after running populate.py, run picfinder.py to check magiccards.info for downloadable pictures of cards
+after running populate.py, run picfinder.py to check magiccards.info for downloadable pictures of newly added cards
 """
 import os
 import path
@@ -115,14 +115,14 @@ class DBMagic (object):
         populate database with list-of-dict values for dict.keys() that are in db-columns
         Parameters
         ----------
-        data - list of dict cum json objects returned from requests whose wanted keys have been made DB column names
+        data - list of dict cum json objects whose wanted keys have been made DB column names
         tbl - db_table to which we add this data
-        key - the PRIMARY KEY that the db index is being done on
+        key - the sqlite PRIMARY KEY that the table index is being done on
 
         Returns
         -------
         side effect = database entry. Made an UPSERT from strings that accepts any number of key: vals
-        as long as keys are column names. keys can also make columns. sqlite3 has no native UPSERT command.
+        as long as keys are column names. sqlite3 has no native UPSERT command.
         """
         n, error_count = -1, 0
         if key_column is None:
@@ -197,7 +197,8 @@ def asynch_getter(unsent, groupsize_limit=None, DBG=DEBUG):
 
 def column_parser(datas, exclusions=None, DEBUG=DEBUG):
     """
-    called by column_type_parser() now
+    called by column_type_parser() now. It filters out unwanted columns so they don't
+    get into the database. Just for peace-of-mind in avoiding bloat.
     Parameters
     ----------
     datas: a list of dicts, possibly derived from downloaded json card data
@@ -224,6 +225,7 @@ def column_parser(datas, exclusions=None, DEBUG=DEBUG):
 def column_type_parser(datas, exclusions=None, types_map=None, DEBUG=DEBUG):
     """
     this supplies columns & types that need to be added to db from import data
+    .json is a custom sqlite type here so it can 'natively' handle nested dict & list!
     datas: your list of dict containing the data that may not have column-headers (keys) in db
     types_map: user created {'python type() output as string': 'sqlite-data-type', ...}
     - returns -
@@ -263,7 +265,7 @@ def check_for_updates(update_url, oldfn, need_all=False, DBG=DEBUG):
     newness = __newness__
     check_codes = []
     most_recent = u"0.0.0"
-    # see if there have been previous updates
+    # see if there have been previous updates recorded in local files
     try:
         with open(oldfn, mode='rb') as fob:
             old_stuff = json.load(fob)
@@ -274,7 +276,7 @@ def check_for_updates(update_url, oldfn, need_all=False, DBG=DEBUG):
     if need_all:
         most_recent = u"0.0.0"
     old_version = [int(a) for a in most_recent.split(u".")]
-    # get update file
+    # get update file from web
     try:
         req_new = requests.get(update_url).json()
     except Exception as e:
@@ -291,6 +293,7 @@ def check_for_updates(update_url, oldfn, need_all=False, DBG=DEBUG):
                     check_codes.extend(req_new[i][tag])
         else:  # versions are indexed newest to oldest
             break
+    # save the update file locally for comparison next time
     try:
         with open(oldfn, mode='wb') as wob:
             json.dump(req_new, wob)

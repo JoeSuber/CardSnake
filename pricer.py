@@ -1,12 +1,13 @@
 #!/usr/bin/env python -S
 # -*- coding: utf-8 -*-
 """
-get the price info for all cards from mtgprice.com and cache it into database
-1) get web-links-to-price-lists mapped to database set-codes
-    a) use release-date and set-name matching, both approximate, perhaps Levenshtien distance
+get the price info for all cards from mtgprice.com and cache it into local database
+1) get web-links-to-price-lists mapped to existing local database set-codes.
+    a) for robustness, use release-date and set-name matching, both approximate, by Levenshtien distance
 2) use json-encoded price data found on spoiler-list pages to populate a price-list table, adding the local set-code to
     each card-entry
-3) make a function that will find prices given an exact local set-code and an approximate card-name-string
+3) assign mtgprice.com 'cardID' (for foils and regular cards) to local 'id' so that price data is quickly accessed.
+    a) Use iterative winnowing of prospective matches and local names (within set-codes) to avoid mis-assignments.
 """
 
 import picfinder as pf
@@ -16,7 +17,7 @@ import json
 import time
 from collections import defaultdict
 
-# how much time required between subsequent price scrapes:
+# time required between subsequent price scrapes:
 HOUR_DELAY = 2.0
 
 price_db = pf.peep.DBMagic(DBfn=pf.peep.__sqlcards__,
@@ -63,11 +64,13 @@ def mtgdate_map(url='http://www.mtgprice.com/magic-the-gathering-prices.jsp'):
 
 
 def localsets(db=pf.peep.set_db, sql="SELECT code, name, mkm_name, releaseDate FROM set_infos"):
+    """ hack to allow easier matching of local set-names to mtgprices names"""
     return [(l[0], l[1].replace('Limited Edition ', '').replace('Classic ', ''), l[2], l[3])
             for l in db.cur.execute(sql).fetchall()]
 
 
 def recent_checked(unchecked_codes, current_time=None, hour_delay=HOUR_DELAY, db=pf.peep.card_db):
+    """ filter out the items returned by correspondence() that have been too recently checked"""
     if 'last_update' not in db.show_columns('cards'):
         return unchecked_codes
     if current_time is None:
@@ -91,7 +94,7 @@ def recent_checked(unchecked_codes, current_time=None, hour_delay=HOUR_DELAY, db
 def correspondence():
     """
     external functions: localsets() and mtgdate_map() are used to supply data.
-
+    Uses name, release year, and then full release date to score the similarity of a set-code to its mtgprices name.
     Returns: dict of {web-link to a set-pricelist: best match among local set-codes, ...}
     """
     locs = localsets()
@@ -126,7 +129,6 @@ def allprices(lmap, db=price_db):
     """
     biglist = []
     for item_num, (link, info) in enumerate(lmap.viewitems()):
-
         pricelist = prices(link)
         for card in pricelist:
             card['set_code'] = info[0][0][0]
@@ -169,6 +171,7 @@ def name_check(cardname, possibles=None, foil=False,):
 
 
 def set_has_foils(setcode, default_linelen=2, db=price_db):
+    """ used for knowing when a row-entry is complete, and thus can be removed from prospects"""
     return default_linelen + int(any([int(f[0] or 0)
                                       for f in db.cur.execute("SELECT isFoil FROM prices WHERE set_code=?",
                                                              (setcode, )).fetchall()]))
@@ -185,14 +188,14 @@ def multi_price(cardset, dbp=price_db, dbid=pf.peep.card_db, DEBUG=False):
     are far more accurate than attempting to match all against all while using the needed approximate string matching.
     Parameters
     ----------
-    cardset: the 3-letter all-caps set-code imported with mtgjson.com data and used in local cards_db
-    dbp: the price database scraped from mtgprices.com spoiler pages, with a local cardset already added to each entry
-    dbid: the cards_db that holds the mtgjson derived data and is keyed by a sha1 hash ('id')
+    cardset: the 3-letter all-caps set-code imported with mtgjson.com data and used in the local cards_db
+    dbp: the price database scraped from mtgprices.com spoiler pages, with that cardset already added to each entry
+    dbid: the cards_db that holds the local mtgjson derived data and is keyed by a sha1 hash ('id')
 
     Side-Effects:
     -------
-    attaches the price_db 'cardId' to the appropriate entries (new regular & foil columns) in the cards_db.
-    This will allow for faster and more accurate access to price data by the local 'id' of a card.
+    attaches appropriate entries (regular & foil 'cardId' from mtgprices.com) to 'id' in cards_db.
+    This will allow for faster and more accurate access to price data by the simple local 'id' of a card.
     Also adds the date of the last price change/check in "seconds since the epoch" float style.
     """
     columns = (u'cardId', u'name', u'isFoil')

@@ -1,7 +1,7 @@
 #!/usr/bin/env python -S
 # -*- coding: utf-8 -*-
 """
-this is a demonstration of matching and pricing tools run using some key presses. A web-cam is required.
+this is a demonstration of matching and pricing tools run using some user key presses. A web-cam is required.
 One of the windows has to to be on 'top' of your GUI and active to accept the various key-presses.
 """
 import cv2

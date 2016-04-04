@@ -19,11 +19,11 @@ import pricer
 Card = namedtuple('Card', 'name, code, id, pic_path, kp')
 
 
-def card_corners(camx, camy, xc, yc):
-    return (camx - xc)/2, (camy - yc)/2, camx/2 + xc/2, camy/2 + yc/2
+#def card_corners(camx, camy, xc, yc):
+#    return (camx - xc)/2, (camy - yc)/2, camx/2 + xc/2, camy/2 + yc/2
 
 
-def card_compare(imgsamp, look, matchmaker, distance_ratio=0.82):
+def card_compare(imgsamp, look, matchmaker, distance_ratio=0.84):
     """
     Parameters
     ----------
@@ -87,7 +87,7 @@ def card_adder(prospect_ids, matchmaker, db, currentcards, maxitems=5000):
 
 class Posts(object):
     """
-    provides visualization and allows user to warp the a sub-section of the camera image into alignment with
+    provides visualization and allows user to warp a sub-section of the camera image into alignment with
     an 'ideal' image to be used in the card-id process.
     """
     def __init__(self, camx=640, camy=480, yc=445, xc=312):
@@ -125,13 +125,14 @@ class Posts(object):
         draw_str(cam_img, (20, 17), saying)
         return cam_img
 
-    def show_card_info(self, texts, chalkboard, max_expansion=2.5, topleft=(5, 5)):
+    def show_card_info(self, texts, chalkboard, max_expansion=2.6, topleft=(5, 5)):
         """ take a list of text lines and draw each so it fits in most of the width of the given image"""
         startx, starty = topleft
-        max_x = chalkboard.shape[1] - startx * 2
+        max_x = chalkboard.shape[1] - startx * 2    # leaves margins
         for txt in texts:
             (sx, sy), baseline = cv2.getTextSize(txt, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1, thickness=2)
-            sy += baseline
+            # baseline: straggling font-pixels extending below base of most letters, i.e. g p q
+            sy += baseline * 0.5
             size_ratio = min(max_x / sx, max_expansion)
             starty += (int(sy * size_ratio) + 2)
             draw_str(chalkboard, (startx, starty), txt, font=cv2.FONT_HERSHEY_PLAIN, size=size_ratio, color=(0, 255, 0))
@@ -173,8 +174,8 @@ class Robot(object):
                    'end_stop_status': 'M119',
                    'positions': 'M114',
                    'stop': 'M410'}
-        self.times = {'pickup_pos': 2.9,
-                      'drop_pos': 2.9,
+        self.times = {'pickup_pos': 2.7,
+                      'drop_pos': 2.7,
                       'fan_on': 0.1,
                       'fan_off': 0.1,
                       'servo_drop': 0.6,
@@ -204,8 +205,8 @@ class Robot(object):
         self.PICKING_UP = False
 
         # adjust sort categories quantity and bin position here:
-        self.bins = OrderedDict([('Low', 125), ('High', 247.5)])
-        self.bin_cuts = OrderedDict([('Low', 0.0), ('High', 0.5)])
+        self.bins = OrderedDict([('Low', 125), ('High', 247.5), ('NoID', 50.0)])
+        self.bin_cuts = OrderedDict([('Low', 0.0), ('High', 0.5), ('NoID', 10000.0)])
         self.bin_sliver = 0.2
         self.LOADING = True
         tl = self.con.readline()
@@ -351,8 +352,9 @@ class Robot(object):
 def main():
     robot = Robot()
     eyeball = Posts()
-    MIN_MATCHES = 15
+    MIN_MATCHES = 13
     MAX_ITEMS = 600
+    MAX_FAILS = 100
     RUN_FAN = False
     cardlist = []
     smile = orientation.Simile(just_faces=False)
@@ -383,8 +385,14 @@ def main():
             print robot.sensor_stats(min_ret=100)
         if ch == ord('w'):
             print robot.xyz_pos()
+        if ch == ord('e'):
+            print("i'm [e] pressed!")
+            ee = smile.updown(warp)
+            print("DIST:   vs UP:    vs DOWN:")
+            for q in sorted([ee.keys()]):
+                print("{:6} - {:6}  - {:6}".format(q, ee[q][0], ee[q][1]))
+                
         if ch == ord('g') and not robot.ID_DONE:
-            print ("[g] pressed")
             matcher, cardlist = card_adder(smile.handful(warp), matcher, orientation.orient_db, cardlist,
                                        maxitems=MAX_ITEMS)
             current_kp, matchdict = card_compare(warp, looker, matcher)
@@ -395,6 +403,8 @@ def main():
                 print("No luck: {} fails".format(id_failure_cnt))
             if len(bestmatch) > 1:
                 print("Has {} candidates".format(len(bestmatch)))
+            if (id_failure_cnt > MAX_FAILS) and not bestmatch:
+                print("Couldn't match this in {} tries".format(id_failure_cnt))
             for indx, matches in bestmatch:
                 one_card = cardlist[indx]
                 pricestr = 'None'
@@ -406,7 +416,7 @@ def main():
                 robot.ID_DONE = True
                 bin = robot.bin_lookup(pricetag)
                 new_window = "{} {} | {}".format(one_card.name, one_card.code, pricestr)
-                warp = eyeball.show_card_info(new_window.split(" | "), warp, max_expansion=2.5, topleft=(5, 5))
+                warp = eyeball.show_card_info(new_window.split(" | "), warp, max_expansion=2.6, topleft=(5, 5))
                 cv2.imshow(new_window, cv2.drawMatchesKnn(warp, current_kp,
                                                 cv2.imread(os.path.join(pathfront, one_card.pic_path)),
                                                   one_card.kp, matches,
@@ -445,6 +455,7 @@ def main():
                 lift = 0.22
             else:
                 lift = 0.6
+                print("No card stuck? Going back.g")
             robot.hopper_up(bite=lift)
             wait = robot.dothis("servo_drop") + time.time()
             robot.NEED_DROP = False

@@ -3,10 +3,10 @@
 
 """
 The json data for magic sets is splotchy at best. If card numbers are present, they are used,
-but matching by name is often required even though many cards share the same name! Even inside
-a set of cards this can be the case (Swamp, Swamp, Swamp).
+but matching picture titles to names is often required even though many different cards share the same name!
+Even inside set of cards this can be the case (Swamp, Swamp, Swamp).
 Sometimes names don't match due to differences in unicode-points or even typos.
-Levenshtein distance is the last resort to try and get the match to a picture-link.
+Levenshtein distance is the last resort to try and get the unique match to a picture-link.
 
 create local pic-path column in the cards database (if none)
 create card count column in sets db

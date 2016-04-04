@@ -1,17 +1,13 @@
 #!/usr/bin/env python -S
 # -*- coding: utf-8 -*-
-
 """
 1) given pic (probably via camera), save it to a local dir, get dct and keypoint/desc info into db
     a) must create 'id' hash, and a meaningful filename, ensuring no collisions on 'id'.
-    b) for these non-stock images, choose and record some 'best matches'
-       (list of ids) from among the stock images
     c) maybe allow user intervention via text entry or gui image selection
-    d) for repeated similar user-images, test to see if hamming distances to pre-computed items are always
+    d) todo: for repeated similar user-images, test to see if hamming distances to pre-computed items are always
         significantly lower than against the stock images
     e) build this with inclusion into the robot control loop in mind
 """
-
 
 import cv2
 import orientation
