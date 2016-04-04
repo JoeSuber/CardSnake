@@ -130,7 +130,8 @@ class Posts(object):
         startx, starty = topleft
         max_x = chalkboard.shape[1] - startx * 2
         for txt in texts:
-            sx, sy = cv2.getTextSize(txt, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1, thickness=2)
+            (sx, sy), baseline = cv2.getTextSize(txt, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1, thickness=2)
+            sy += baseline
             size_ratio = min(max_x / sx, max_expansion)
             starty += (int(sy * size_ratio) + 2)
             draw_str(chalkboard, (startx, starty), txt, font=cv2.FONT_HERSHEY_PLAIN, size=size_ratio, color=(0, 255, 0))
@@ -337,9 +338,9 @@ class Robot(object):
         while nudge_up:
             if time.time() > wait:
                 wait = self.hopper_up() + time.time()
-                sensor = None
-                while not sensor:
-                    time.sleep(.01)
+                sensor = self.sensor_stats()
+                while 'y_max' not in sensor.keys():
+                    time.sleep(.1)
                     sensor = self.sensor_stats()
             if "TRIGGERED" in sensor['y_max']:
                 nudge_up = False
