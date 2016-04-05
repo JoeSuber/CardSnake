@@ -351,6 +351,7 @@ def main():
     MAX_ITEMS = 600
     MAX_FAILS = 100
     RUN_FAN = False
+    GRIP, TRIP = 1, 1
     cardlist = []
     smile = orientation.Simile(just_faces=False)
     pathfront = orientation.peep.__mtgpics__
@@ -367,7 +368,6 @@ def main():
         __, frame = cam.read()
         showimg = eyeball.draw_guides(frame.copy())
         warp = eyeball.get_warp(frame)
-        cv2.imshow("flip", warp[::-1, ::-1])
         cv2.imshow("warp", warp)
         cv2.imshow("cam", showimg)
         ch = cv2.waitKey(1) & 0xff
@@ -389,17 +389,24 @@ def main():
                 print("{:6} - {:6}  - {:6}".format(q, ee[q][0], ee[q][1]))
         if ch == ord('g') and not robot.ID_DONE:
             old_cardlist_len = len(cardlist)
-            matcher, cardlist = card_adder(smile.fistfull(warp, trips=2, grip=2), matcher, orientation.orient_db, cardlist,
+            matcher, cardlist = card_adder(smile.fistfull(warp, trips=TRIP, grip=GRIP), matcher, orientation.orient_db, cardlist,
                                            maxitems=MAX_ITEMS)
             current_kp, matchdict = card_compare(warp, looker, matcher)
             bestmatch = sorted([(i, matches) for i, matches in matchdict.viewitems() if len(matches) > MIN_MATCHES],
                                key=lambda x: len(x[1]), reverse=True)
             if not bestmatch:
                 id_failure_cnt += 1
-                msg = "" if (len(cardlist) != old_cardlist_len) else \
-                    ", and nothing new added to matcher (len={})".format(old_cardlist_len)
+                msg = ""
+                if (len(cardlist) != old_cardlist_len):
+                    GRIP += 1
+                    TRIP += np.random.randint(-1, 2)
+                    if (TRIP > 2) or (TRIP < 0):
+                        TRIP = 1
+                    msg = ", and nothing new added to matcher (len={})".format(old_cardlist_len)
+
                 print("No luck: {} fails{}".format(id_failure_cnt, msg))
             if len(bestmatch) > 1:
+                GRIP = 1
                 print("Has {} candidates".format(len(bestmatch)))
             if (id_failure_cnt > MAX_FAILS) and not bestmatch:
                 print("Couldn't match this in {} tries".format(id_failure_cnt))
