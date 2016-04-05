@@ -393,14 +393,17 @@ def main():
             for q in sorted(ee.keys()):
                 print("{:6} - {:6}  - {:6}".format(q, ee[q][0], ee[q][1]))
         if ch == ord('g') and not robot.ID_DONE:
-            matcher, cardlist = card_adder(smile.handful(warp), matcher, orientation.orient_db, cardlist,
-                                       maxitems=MAX_ITEMS)
+            old_cardlist_len = len(cardlist)
+            matcher, cardlist = card_adder(smile.fistfull(warp), matcher, orientation.orient_db, cardlist,
+                                           maxitems=MAX_ITEMS)
             current_kp, matchdict = card_compare(warp, looker, matcher)
             bestmatch = sorted([(i, matches) for i, matches in matchdict.viewitems() if len(matches) > MIN_MATCHES],
                                key=lambda x: len(x[1]), reverse=True)
             if not bestmatch:
                 id_failure_cnt += 1
-                print("No luck: {} fails".format(id_failure_cnt))
+                msg = "" if (len(cardlist) != old_cardlist_len) else \
+                    ", and nothing new added to matcher (len={})".format(old_cardlist_len)
+                print("No luck: {} fails{}".format(id_failure_cnt, msg))
             if len(bestmatch) > 1:
                 print("Has {} candidates".format(len(bestmatch)))
             if (id_failure_cnt > MAX_FAILS) and not bestmatch:

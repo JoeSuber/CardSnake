@@ -219,7 +219,7 @@ class Simile(object):
         self.ups = outgoing[facemask, 0]
         self.dwn = outgoing[facemask, 1]
         self.ids = outgoing[facemask, 3]
-        self.default_distance = 15
+        self.default_distance = 6
         # vectorize lets gmpy2.hamdist get 'broadcast' over numpy arrays. speedily.
         self.gmp_hamm = np.vectorize(gmpy2.hamdist)
 
@@ -242,43 +242,59 @@ class Simile(object):
         print "score down: ", np.sum(self.gmp_hamm(self.dwn, dct))
         return np.sum(self.gmp_hamm(self.ups, dct)) < np.sum(self.gmp_hamm(self.dwn, dct))
 
-    def handful(self, img, flipit=15):
+    def handful(self, img, flipit=15, dist=None):
         """
         img: full image probably lifted from a user input device
         flipit: the hamming distance where it may be wise to try an inverted version of img to get closer results
 
         Returns
         -------
-        list1: a minimal list of ids-to-database-images with the closest hamming distance
-        to the top or bottom of the input img dct.
+        list1: a list of 4 or more ids-to-database-images with the closest hamming distance
+        to the top of the input img dct.
         """
-        d = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+        if dist is None:
+            dist = self.default_distance
+        dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         SEARCH = True
         while SEARCH:
-            list1 = self.hamm_ups(d, self.default_distance)
-            list2 = self.hamm_ups(d, self.default_distance - 1)
-            if len(list1) < 3:
-                self.default_distance += 2
+            list1 = self.hamm_ups(dct, dist)
+            if len(list1) < 4:
+                dist += 2
                 continue
-            if len(list2) > 2:
-                self.default_distance -= 1
+            if len(self.hamm_ups(dct, dist - 1)) > 3:
+                dist -= 1
                 continue
             SEARCH = False
         #print("results at distance: {} (flipit={})".format(self.default_distance, flipit))
-
-        if self.default_distance > flipit:
-            return self.handful(img[::-1, ::-1], flipit=flipit+1)
-
+        if dist > flipit:
+            return self.handful(img[::-1, ::-1], flipit=flipit+1, dist=dist-5)
         #print("".join(("{:3}: {}{}".format(n+1, idname(l)[:2], os.linesep) for n, l in enumerate(list1))))
         return list1
 
     def updown(self, img, rng=(4, 19)):
-        """ for testing different efficient ways of telling up from down """
-        d = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+        """ for testing different efficient ways of telling up from down, shit from shine-ola """
+        dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         dd = {}
         for dist in xrange(rng[0], rng[1]):
-            dd[dist] = (len(self.hamm_ups(d, dist)), len(self.hamm_down(d, dist)))
+            dd[dist] = (len(self.hamm_ups(dct, dist)), len(self.hamm_down(dct, dist)))
         return dd
+
+    def fistfull(self, img):
+        """ a more conventional and probably less expensive approach than handful """
+        dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+        for dist in xrange(5, 20):
+            ups = np.sum(self.gmp_hamm(self.ups,  dct) < dist)
+            downs = np.sum(self.gmp_hamm(self.dwn,  dct) < dist)
+            print("{:3}:  ups {},  downs {}".format(dist, ups, downs))
+            if ups == downs:
+                continue
+            if (ups > 3) and (ups > downs):
+                return self.hamm_ups(dct, dist)
+            if (downs > 3) and (downs > ups):
+                return self.fistfull(img[::-1, ::-1])
+
+        print("Simile.fistfull() can't make head nor tail of the image!")
+        return []
 
 
 def mirror_cards():
