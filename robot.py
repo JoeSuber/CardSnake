@@ -387,6 +387,10 @@ def main():
             print("DIST:   vs UP:    vs DOWN:")
             for q in sorted(ee.keys()):
                 print("{:6} - {:6}  - {:6}".format(q, ee[q][0], ee[q][1]))
+        if ch == ord('r'):
+            print("[r] cards in matcher: {}".format(len(cardlist)))
+            for n, card in enumerate(cardlist):
+                print("{:3}: {:4} - {}".format(n, card.code, card.name))
         if ch == ord('g') and not robot.ID_DONE:
             old_cardlist_len = len(cardlist)
             matcher, cardlist = card_adder(smile.fistfull(warp, trips=TRIP, grip=GRIP), matcher, orientation.orient_db, cardlist,
@@ -397,12 +401,13 @@ def main():
             if not bestmatch:
                 id_failure_cnt += 1
                 msg = ""
-                if (len(cardlist) != old_cardlist_len):
+                if (len(cardlist) == old_cardlist_len):
                     GRIP += 1
                     TRIP += np.random.randint(-1, 2)
                     if (TRIP > 2) or (TRIP < 0):
                         TRIP = 1
-                    msg = ", and nothing new added to matcher (len={})".format(old_cardlist_len)
+                    msg = ", and nothing new added to matcher(len={}) GRIP={}, TRIP={}"\
+                        .format(old_cardlist_len, GRIP, TRIP)
 
                 print("No luck: {} fails{}".format(id_failure_cnt, msg))
             if len(bestmatch) > 1:
