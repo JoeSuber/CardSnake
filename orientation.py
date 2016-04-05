@@ -279,19 +279,19 @@ class Simile(object):
             dd[dist] = (len(self.hamm_ups(dct, dist)), len(self.hamm_down(dct, dist)))
         return dd
 
-    def fistfull(self, img):
+    def fistfull(self, img, trips=0):
         """ a more conventional and probably less expensive approach than handful """
         dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
-        for dist in xrange(5, 20):
+        for dist in xrange(6 + trips, 20):
             ups = np.sum(self.gmp_hamm(self.ups,  dct) < dist)
             downs = np.sum(self.gmp_hamm(self.dwn,  dct) < dist)
             print("{:3}:  ups {},  downs {}".format(dist, ups, downs))
             if ups == downs:
                 continue
-            if (ups > 3) and (ups > downs):
-                return self.hamm_ups(dct, dist)
-            if (downs > 3) and (downs > ups):
-                return self.fistfull(img[::-1, ::-1])
+            if (ups > (3 - trips)) and (ups > (downs - trips)):
+                return self.hamm_ups(dct, dist)     # success!
+            if (downs > trips) and (downs > ups):
+                return self.fistfull(img[::-1, ::-1], trips=trips+1)     # recur to a point
 
         print("Simile.fistfull() can't make head nor tail of the image!")
         return []
