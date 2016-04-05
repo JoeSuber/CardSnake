@@ -15,12 +15,7 @@ from cv2_common import Timer, draw_str
 import orientation
 import pricer
 
-
 Card = namedtuple('Card', 'name, code, id, pic_path, kp')
-
-
-#def card_corners(camx, camy, xc, yc):
-#    return (camx - xc)/2, (camy - yc)/2, camx/2 + xc/2, camy/2 + yc/2
 
 
 def card_compare(imgsamp, look, matchmaker, distance_ratio=0.84):
@@ -394,7 +389,7 @@ def main():
                 print("{:6} - {:6}  - {:6}".format(q, ee[q][0], ee[q][1]))
         if ch == ord('g') and not robot.ID_DONE:
             old_cardlist_len = len(cardlist)
-            matcher, cardlist = card_adder(smile.fistfull(warp), matcher, orientation.orient_db, cardlist,
+            matcher, cardlist = card_adder(smile.fistfull(warp, trips=2, grip=2), matcher, orientation.orient_db, cardlist,
                                            maxitems=MAX_ITEMS)
             current_kp, matchdict = card_compare(warp, looker, matcher)
             bestmatch = sorted([(i, matches) for i, matches in matchdict.viewitems() if len(matches) > MIN_MATCHES],

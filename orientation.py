@@ -272,7 +272,7 @@ class Simile(object):
         #print("".join(("{:3}: {}{}".format(n+1, idname(l)[:2], os.linesep) for n, l in enumerate(list1))))
         return list1
 
-    def updown(self, img, rng=(4, 20)):
+    def updown(self, img, rng=(4, 18)):
         """ for testing different efficient ways of telling up from down, shit from shine-ola """
         dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         dd = {}
@@ -280,19 +280,20 @@ class Simile(object):
             dd[dist] = (len(self.hamm_ups(dct, dist)), len(self.hamm_down(dct, dist)))
         return dd
 
-    def fistfull(self, img, trips=0):
+    def fistfull(self, img, trips=0, grip=1):
         """ replaces handful with a rube-goldberg machine """
         if trips > 2:
             # always gives at least one result but always uses the same quantity of costly operations
             dcts = [dct_hint(cv2.equalizeHist(cv2.cvtColor(im[:im.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
                     for im in [img, img[::-1, ::-1]]]
             start, uplist = 5, {}
-            # counting the zeroes determines the quality of each list (fewer=better) and index of first result > 0
+            # counting the zeroes determines the quality of each list (fewer=better) and
+            # index of first result > 0 (plus starting value) is the min cut value for generating the list of ids
             for tag, dct in enumerate(dcts):
-                uplist[tag] = [np.sum(self.gmp_hamm(self.ups, dct) < dist) for dist in xrange(start, 20)].count(0)
+                uplist[tag] = [np.sum(self.gmp_hamm(self.ups, dct) < dist) for dist in xrange(start, 19)].count(0)
             best_idx, first_result = sorted([(k, v) for k, v in uplist.viewitems()], key=itemgetter(1))[0]
             print("*** used long way home ***")
-            return self.hamm_ups(dcts[best_idx], first_result + start + 1)  # success!
+            return self.hamm_ups(dcts[best_idx], first_result + start + grip)  # success!
 
         # uses pre-calculated "downs" to avoid doing two dcts on sample, and can exit early very often
         # also tries to return more than 1 result in an effort to give the matcher some options
