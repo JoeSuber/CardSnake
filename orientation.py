@@ -7,6 +7,7 @@ generate some dct data if needed. Use it to help determine the most similar imag
 run populate first, then picfinder, then run orientation and wait a few minutes while new dcts are added to database
 """
 from collections import defaultdict, Counter
+from operator import itemgetter
 import gmpy2
 from gmpy2 import mpz
 from cv2_common import *
@@ -271,7 +272,7 @@ class Simile(object):
         #print("".join(("{:3}: {}{}".format(n+1, idname(l)[:2], os.linesep) for n, l in enumerate(list1))))
         return list1
 
-    def updown(self, img, rng=(4, 19)):
+    def updown(self, img, rng=(4, 20)):
         """ for testing different efficient ways of telling up from down, shit from shine-ola """
         dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         dd = {}
@@ -280,7 +281,21 @@ class Simile(object):
         return dd
 
     def fistfull(self, img, trips=0):
-        """ a more conventional and probably less expensive approach than handful """
+        """ replaces handful with a rube-goldberg machine """
+        if trips > 2:
+            # always gives at least one result but always uses the same quantity of costly operations
+            dcts = [dct_hint(cv2.equalizeHist(cv2.cvtColor(im[:im.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+                    for im in [img, img[::-1, ::-1]]]
+            start, uplist = 5, {}
+            # counting the zeroes determines the quality of each list (fewer=better) and index of first result > 0
+            for tag, dct in enumerate(dcts):
+                uplist[tag] = [np.sum(self.gmp_hamm(self.ups, dct) < dist) for dist in xrange(start, 20)].count(0)
+            best_idx, first_result = sorted([(k, v) for k, v in uplist.viewitems()], key=itemgetter(1))[0]
+            print("*** used long way home ***")
+            return self.hamm_ups(dcts[best_idx], first_result + start + 1)  # success!
+
+        # uses pre-calculated "downs" to avoid doing two dcts on sample, and can exit early very often
+        # also tries to return more than 1 result in an effort to give the matcher some options
         dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         for dist in xrange(6 + trips, 20):
             ups = np.sum(self.gmp_hamm(self.ups,  dct) < dist)
@@ -291,7 +306,7 @@ class Simile(object):
             if (ups > (3 - trips)) and (ups > (downs - trips)):
                 return self.hamm_ups(dct, dist)     # success!
             if (downs > trips) and (downs > ups):
-                return self.fistfull(img[::-1, ::-1], trips=trips+1)     # recur to a point
+                return self.fistfull(img[::-1, ::-1], trips=trips+1)     # recur a little bit
 
         print("Simile.fistfull() can't make head nor tail of the image!")
         return []
