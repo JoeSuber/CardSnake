@@ -257,7 +257,7 @@ class Robot(object):
         # print("actual speed: {}, ret: {}".format(time.time() - start, finalwait))
         return xyz_dict or self.xyz_pos(min_ret=min_ret-1)
 
-    def go_xz(self, bin_name, timeconst=0.043, reverse=False):
+    def go_xz(self, bin_name, timeconst=0.07, reverse=False):
         """given a destination bin, position everything for the drop, while decrementing for the next drop into the bin and
         return the estimated time from the present when the drop can happen"""
         back = 1 if not reverse else -1
