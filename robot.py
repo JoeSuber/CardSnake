@@ -174,11 +174,11 @@ class Robot(object):
                       'fan_on': 0.1,
                       'fan_off': 0.1,
                       'servo_drop': 0.6,
-                      'servo_up': 1.5,
+                      'servo_up': 1.0,
                       'end_stop_status': 0.06,
                       'positions': 0.06,
                       'stop': 0.02}
-        self.BLOCKED = False
+        self.sensor_keys = ["x_min", "y_min", "z_min", "x_max", "y_max"]
         time.sleep(0.4)
 
         # M115 info string request
@@ -195,7 +195,7 @@ class Robot(object):
         self.con.write(self.do['drop_pos'] + nl + " " + self.do['servo_up'] + nl)
         self.con.write(self.do['fan_off'] + nl)
         self.NEED_DROP = False
-        self.SHOULD_RETURN = False
+        self.CARD_CARRIED = False
         self.ID_DONE = False
         self.PICKING_UP = False
 
@@ -224,19 +224,19 @@ class Robot(object):
                 binname = bk
         return binname
 
-    def sensor_stats(self, min_ret=99):
+    def sensor_stats(self, min_ret=99, retry=0):
         """returns dict of end-stop sensors, keyed by sensor name, with values of 'open' or 'TRIGGERED'"""
         wait = self.dothis('end_stop_status') + time.time()
-        # start = time.time()
-        # inw = self.con.inWaiting()
         while (time.time() < wait) and (self.con.inWaiting() < min_ret):
             pass
-            # if inw:
-                # print "inwaiting: ", inw
-            # inw =
-        # print("actual speed: {}, ret: {}".format(time.time() - start, self.con.inWaiting()))
-        return dict([tuple(chunk.split(": ")) for chunk in self.con.read(size=self.con.inWaiting()).split(self.nl)
+        sensordict = dict([tuple(chunk.split(": ")) for chunk in self.con.read(size=self.con.inWaiting()).split(self.nl)
                     if (': ' in chunk) and (('_min' in chunk) or ('_max' in chunk))])
+        skeys = sensordict.keys()
+        if all([sk in skeys for sk in self.sensor_keys]):
+            return sensordict
+        retry += 1
+        print("Retry sensor_stats() #{}".format(retry))
+        return self.sensor_stats(min_ret=min_ret, retry=retry)
 
     def xyz_pos(self, min_ret=59):
         """ returns dict of current stepper DESTINATIONS (in float(mm)) keyed by single-letter axis names"""
@@ -257,7 +257,7 @@ class Robot(object):
         # print("actual speed: {}, ret: {}".format(time.time() - start, finalwait))
         return xyz_dict or self.xyz_pos(min_ret=min_ret-1)
 
-    def go_z(self, bin_name, timeconst=0.043):
+    def go_xz(self, bin_name, timeconst=0.043):
         """given a destination bin, position everything for the drop, while decrementing for the next drop into the bin and
         return the estimated time from the present when the drop can happen"""
         newz = float(self.bins[bin_name])
@@ -268,7 +268,7 @@ class Robot(object):
         self.dothis("G1 Z" + str(newz) + " " + x_spot)
         return z_time if z_time > self.times['drop_pos'] else self.times['drop_pos']
 
-    def hopper_up(self, y_current=None, bite=1.1, timeconst=0.5):
+    def hopper_up(self, y_current=None, bite=1.1, timeconst=0.7):
         """ raise the input hopper by a little bit, return the seconds it is estimated to take"""
         if y_current is None:
             try:
@@ -283,62 +283,53 @@ class Robot(object):
         """ load cards until bottom switch is triggered, indicating max capacity, but only move
         down while top proximity sensor is triggered. Set self.LOADING false when done"""
         # first move up until proximity sensor is triggered to get the platform up top
-        must_have = ['y_min', 'y_max']
         print("Movin' on up (until top sensor triggered)")
         self.dothis("G0 Y{}".format(y_top))
         INITIALIZE_UP = True
         while INITIALIZE_UP:
             sensor = self.sensor_stats()
-            if all([mh in sensor.keys() for mh in must_have]):
-                if 'TRIGGERED' in sensor['y_max']:
-                    print("top sensor = {}".format(sensor['y_max']))
-                    time.sleep(self.dothis("stop"))
-                    INITIALIZE_UP = False
+            if 'TRIG' in sensor['y_max']:
+                print("top sensor = {}".format(sensor['y_max']))
+                time.sleep(self.dothis("stop"))
+                INITIALIZE_UP = False
         xyz = self.xyz_pos()
-        print("Okay, now load the Hopper. Loading ends when bottom limit switch is triggered.")
+        print("LOAD THE HOPPER. Loading ends when bottom limit switch is triggered.")
         print("Positions:  {}".format(", ".join([k + ":" + str(v) for k, v in xyz.viewitems()])))
         new_sweep = True
         destination = max((xyz['Y'] - move), 0)
         start = time.time()
         while self.LOADING:
             sensor = self.sensor_stats()
-            if all([mh in sensor.keys() for mh in must_have]):
-                if 'TRIGGERED' in sensor['y_min']:
-                    self.dothis("stop")
-                    self.dothis("G92 Y0")
-                    self.dothis("G0 Y0")
-                    self.LOADING = False
-                    continue
-                if 'TRIGGERED' in sensor['y_max'] and new_sweep:
-                    print("moving down to: Y={}".format(destination))
-                    self.dothis("G0 Y{}".format(destination))
-                    start = time.time()
-                    new_sweep = False
-                if 'open' in sensor['y_max'] and not new_sweep:
-                    print("top sensor Open after {} seconds...".format(time.time()-start))
-                    new_sweep = True
-                    xyz = self.xyz_pos()
-                    if 'Y' in xyz.keys():
-                        destination = max((xyz['Y'] - move), 0)
-                    else:
-                        print("BAD XYZ: {}".format(", ".join([k + ":" + str(v) for k, v in xyz.viewitems()])))
+            if 'TRIG' in sensor['y_min']:
+                self.dothis("stop")
+                self.dothis("G92 Y0")
+                self.dothis("G0 Y0")
+                self.LOADING = False
+                continue
+            if 'TRIG' in sensor['y_max'] and new_sweep:
+                print("moving down to: Y={}".format(destination))
+                self.dothis("G0 Y{}".format(destination))
+                start = time.time()
+                new_sweep = False
+            if 'open' in sensor['y_max'] and not new_sweep:
+                print("top sensor Open after {} seconds...".format(time.time()-start))
+                new_sweep = True
+                xyz = self.xyz_pos()
+                if 'Y' in xyz.keys():
+                    destination = max((xyz['Y'] - move), 0)
+                else:
+                    print("BAD XYZ: {}".format(", ".join([k + ":" + str(v) for k, v in xyz.viewitems()])))
         xyz = self.xyz_pos()
         print("DONE LOADING")
         print("Positions:  {}".format(", ".join([k + ":" + str(v) for k, v in xyz.viewitems()])))
         nudge_up = True
         wait = 0
-        sensor = None
-        while not sensor:
-            time.sleep(.1)
-            sensor = self.sensor_stats()
+        sensor = self.sensor_stats()
         while nudge_up:
             if time.time() > wait:
                 wait = self.hopper_up() + time.time()
                 sensor = self.sensor_stats()
-                while 'y_max' not in sensor.keys():
-                    time.sleep(.1)
-                    sensor = self.sensor_stats()
-            if "TRIGGERED" in sensor['y_max']:
+            if "TRIG" in sensor['y_max']:
                 nudge_up = False
         time.sleep(self.dothis('fan_on'))
         return self.hopper_up(bite=0.2)
@@ -347,11 +338,14 @@ class Robot(object):
 def main():
     robot = Robot()
     eyeball = Posts()
+    DEBUG = True
+    nudge_count = 0
     MIN_MATCHES = 13
     MAX_ITEMS = 600
     MAX_FAILS = 100
     RUN_FAN = False
     GRIP, TRIP = 1, 1
+    ROBOGO = False
     cardlist = []
     smile = orientation.Simile(just_faces=False)
     pathfront = orientation.peep.__mtgpics__
@@ -361,7 +355,7 @@ def main():
     time.sleep(6)
     wait = time.time()
     robot.load_hopper()
-    bin = robot.bin_lookup(0.0)
+    bin_name = robot.bin_lookup(0.0)
     old_window = ""
     id_failure_cnt = 0
     while True:
@@ -390,13 +384,27 @@ def main():
         if ch == ord('r'):
             print("[r] cards in matcher: {}".format(len(cardlist)))
             for n, card in enumerate(cardlist):
-                print("{:3}: {:4} - {}".format(n, card.code, card.name))
-        if ch == ord('g') and not robot.ID_DONE:
+                print("{:3}: {:4} - {}  #kp={}".format(n, card.code, card.name, len(card.kp)))
+        if ch == ord('f'):
+            RUN_FAN = not RUN_FAN
+            if RUN_FAN:
+                wait = robot.dothis('fan_on') + time.time()
+            else:
+                wait = robot.dothis('fan_off') + time.time()
+        if ch == ord('g'):
+            ROBOGO = not ROBOGO
+            print("ROBOGO = {}".format(ROBOGO))
+
+        if ROBOGO and not robot.ID_DONE:
             old_cardlist_len = len(cardlist)
-            matcher, cardlist = card_adder(smile.fistfull(warp, trips=TRIP, grip=GRIP), matcher, orientation.orient_db, cardlist,
-                                           maxitems=MAX_ITEMS)
+            matcher, cardlist = card_adder(smile.fistfull(warp, trips=TRIP, grip=GRIP), matcher, orientation.orient_db,
+                                           cardlist, maxitems=MAX_ITEMS)
             current_kp, matchdict = card_compare(warp, looker, matcher)
-            bestmatch = sorted([(i, matches) for i, matches in matchdict.viewitems() if len(matches) > MIN_MATCHES],
+            texture = len(current_kp)
+            if texture < (MIN_MATCHES * 3):
+                print("WARNING, not enough texture in input image (kp={})".format(texture))
+            bestmatch = sorted([(i, matches) for i, matches in matchdict.viewitems()
+                                if len(matches) > (MIN_MATCHES + texture) / 6],
                                key=lambda x: len(x[1]), reverse=True)
             if not bestmatch:
                 id_failure_cnt += 1
@@ -423,8 +431,7 @@ def main():
                 if priceline:
                     pricetag = priceline[1]
                     pricestr = "$" + " ,$".join(map(str, priceline)[1:3])
-                robot.ID_DONE = True
-                bin = robot.bin_lookup(pricetag)
+                bin_name = robot.bin_lookup(pricetag)
                 new_window = "{} {} | {}".format(one_card.name, one_card.code, pricestr)
                 warp = eyeball.show_card_info(new_window.split(" | "), warp, max_expansion=2.6, topleft=(5, 5))
                 cv2.imshow(new_window, cv2.drawMatchesKnn(warp, current_kp,
@@ -436,41 +443,60 @@ def main():
                     cv2.destroyWindow(old_window)
                 old_window = new_window
                 id_failure_cnt = 0
+                robot.ID_DONE = True
+                # only do all this for the first card on the 'bestmatch' list!
                 break
 
-        if ch == ord('f'):
-            RUN_FAN = not RUN_FAN
-            if RUN_FAN:
-                wait = robot.dothis('fan_on') + time.time()
-            else:
-                wait = robot.dothis('fan_off') + time.time()
+        # with card identified, begin moving the robot
+        current_time = time.time()
 
-        # goal of this convoluted logic is to allow camera to ID cards concurrent with moves & sensor checks
-        if robot.ID_DONE and (not robot.PICKING_UP) and (time.time() > wait):
+        if robot.ID_DONE and (not robot.PICKING_UP) and (current_time > wait):
+            if DEBUG: print("moving arm over hopper")
             wait = robot.dothis("pickup_pos") + time.time()
             robot.PICKING_UP = True
-        if robot.PICKING_UP and (not robot.NEED_DROP) and (time.time() > wait):
+
+        sens = robot.sensor_stats()
+        if robot.PICKING_UP and (current_time > wait):
+            if DEBUG: print("checking that hopper is high enough")
+
+            if "op" in sens['y_max']:
+                if DEBUG: print("raising hopper by default amount")
+                wait = robot.hopper_up() + time.time()
+            if "op" in sens['x_max'] and nudge_count < 12:
+                if DEBUG: print("raising hopper by a nudge {}".format(nudge_count))
+                robot.hopper_up(0.1)
+                nudge_count += 1
+
+        if robot.PICKING_UP and (current_time > wait):
+            if DEBUG: print("suck card from top of hopper")
             wait = robot.dothis("servo_up") + time.time()
-            wait += robot.go_z(bin)
+
+        if robot.PICKING_UP and ("TRIG" in sens["x_max"]) and (current_time > wait):
+            if DEBUG: print("sensor indicates card on board")
+            wait = time.time() + 0.01
+            robot.CARD_CARRIED = True
+            robot.PICKING_UP = False
+
+        if robot.CARD_CARRIED and (current_time > wait):
+            if DEBUG: print("Card is moving out for bin drop")
+            wait = robot.go_xz(bin_name) + time.time()
+            robot.CARD_CARRIED = False
             robot.PICKING_UP = False
             robot.NEED_DROP = True
-        if robot.NEED_DROP and (time.time() > wait):
-            sens = robot.sensor_stats()
-            while 'x_max' not in sens.keys():
-                time.sleep(0.3)
-                print("Had to wait for sensor data before card-drop")
-                sens = robot.sensor_stats()
-            if "TRIG" in sens['x_max']:
-                #todo: record card bin position in database
-                lift = 0.22
-            else:
-                lift = 0.6
-                print("No card stuck? Going back.g")
-            robot.hopper_up(bite=lift)
-            wait = robot.dothis("servo_drop") + time.time()
-            robot.NEED_DROP = False
-            robot.ID_DONE = False
 
+        if robot.NEED_DROP and (current_time > wait):
+            if DEBUG: print("checking that card made it to drop zone")
+            sens = robot.sensor_stats()
+            if "op" in sens['x_max']:
+                if DEBUG: print("*** arrived at drop zone empty! *** going back to get card")
+                robot.NEED_DROP = False
+            else:
+                if DEBUG: print("Dropping card into bin")
+                wait = robot.dothis('servo_drop') + time.time()
+                robot.NEED_DROP = False
+                robot.ID_DONE = False
+                robot.PICKING_UP = False
+            
 
 if __name__ == "__main__":
     exit(main())
