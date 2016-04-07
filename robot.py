@@ -175,17 +175,14 @@ class Robot(object):
                       'fan_off': 0.1,
                       'servo_drop': 0.6,
                       'servo_up': 2.0,
-                      'end_stop_status': 0.06,
+                      'end_stop_status': 0.1,
                       'positions': 0.06,
                       'stop': 0.02}
         self.sensor_keys = ["x_min", "y_min", "z_min", "x_max", "y_max"]
-        time.sleep(0.4)
-
-        # M115 info string request
-        self.con.write("M115" + self.nl)
-        time.sleep(0.5)
+        for w in xrange(5):
+            print("waiting {} seconds to init serial".format(5 - w))
+            time.sleep(1)
         print("serial port: {}   isOpen={}".format(self.con.getPort(), self.con.isOpen()))
-        time.sleep(4)
         # physically home X (arm) Y (hopper) and Z (output bin) to zero positions
         self.con.write("G28 XZ" + nl)
         self.con.write("G28 Y" + nl)
@@ -210,7 +207,7 @@ class Robot(object):
             tl = self.con.readline()
 
     def dothis(self, instruction):
-        """sends instruction to robot and returns the estimated execution time if available"""
+        """ sends instruction to robot and returns the estimated execution time if available """
         if instruction in self.do.keys():
             self.con.write(self.do[instruction] + self.nl)
             return self.times[instruction]
@@ -226,7 +223,14 @@ class Robot(object):
 
     def sensor_stats(self, min_ret=99, retry=0):
         """returns dict of end-stop sensors, keyed by sensor name, with values of 'open' or 'TRIGGERED'"""
-        wait = self.dothis('end_stop_status') + time.time()
+        extra_time = 0
+        if retry > 5:
+            extra_time = 0.05*retry
+        if retry > 12:
+            print("too many retries of sensors = {}".format(retry))
+            return {}
+
+        wait = self.dothis('end_stop_status') + time.time() + extra_time
         while (time.time() < wait) and (self.con.inWaiting() < min_ret):
             pass
         sensordict = dict([tuple(chunk.split(": ")) for chunk in self.con.read(size=self.con.inWaiting()).split(self.nl)
@@ -235,7 +239,7 @@ class Robot(object):
         if all([sk in skeys for sk in self.sensor_keys]):
             return sensordict
         retry += 1
-        print("Retry sensor_stats() #{}".format(retry))
+        # print("Retry sensor_stats() #{}".format(retry))
         return self.sensor_stats(min_ret=min_ret, retry=retry)
 
     def xyz_pos(self, min_ret=59):
@@ -258,8 +262,8 @@ class Robot(object):
         return xyz_dict or self.xyz_pos(min_ret=min_ret-1)
 
     def go_xz(self, bin_name, timeconst=0.07, reverse=False):
-        """given a destination bin, position everything for the drop, while decrementing for the next drop into the bin and
-        return the estimated time from the present when the drop can happen"""
+        """ given a destination bin, position everything for the drop, while decrementing for the next drop into the bin and
+        return the estimated time from the present when the drop can happen """
         back = 1 if not reverse else -1
         newz = float(self.bins[bin_name])
         self.bins[bin_name] -= (self.bin_sliver * back)
