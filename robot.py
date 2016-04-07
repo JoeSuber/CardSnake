@@ -185,7 +185,7 @@ class Robot(object):
         self.con.write("M115" + self.nl)
         time.sleep(0.5)
         print("serial port: {}   isOpen={}".format(self.con.getPort(), self.con.isOpen()))
-
+        time.sleep(4)
         # physically home X (arm) Y (hopper) and Z (output bin) to zero positions
         self.con.write("G28 XZ" + nl)
         self.con.write("G28 Y" + nl)
