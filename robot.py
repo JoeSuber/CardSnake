@@ -423,12 +423,17 @@ def main():
                     msg = ", and nothing new added to matcher(len={}) GRIP={}, TRIP={}"\
                         .format(old_cardlist_len, GRIP, TRIP)
 
-                print("No luck: {} fails{}".format(id_failure_cnt, msg))
+                if DEBUG: print("No luck: {} fails{}".format(id_failure_cnt, msg))
             if len(bestmatch) > 1:
                 GRIP = 1
                 print("Has {} candidates".format(len(bestmatch)))
             if (id_failure_cnt > MAX_FAILS) and not bestmatch:
+                cardlist, GRIP, TRIP = [], 1, 1
+                matcher.clear()
+                robot.ID_DONE = True
+                bin_name = robot.bin_lookup(10000.1)
                 print("Couldn't match this in {} tries".format(id_failure_cnt))
+                id_failure_cnt = 0
             for indx, matches in bestmatch:
                 one_card = cardlist[indx]
                 pricestr = 'None'
@@ -473,10 +478,6 @@ def main():
                 if DEBUG: print("raising hopper by a nudge {}".format(nudge_count))
                 robot.hopper_up(0.1)
                 nudge_count += 1
-
-        #if robot.PICKING_UP and (current_time > wait):
-        #    if DEBUG: print("suck card from top of hopper, {}".format(",".join([k+","+v for k, v in sens.viewitems()])))
-        #    wait = robot.dothis("servo_up") + time.time()
 
         if robot.PICKING_UP and ("TRIG" in sens["x_max"]) and (current_time > wait):
             if DEBUG: print("sensor indicates card on board")
