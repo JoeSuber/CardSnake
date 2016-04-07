@@ -477,9 +477,6 @@ def main():
             if "op" in sens['x_max'] and nudge_count < 12:
                 if DEBUG: print("raising hopper by a nudge {}".format(nudge_count))
                 robot.hopper_up(0.1)
-                nudge_count += 1
-
-        if robot.PICKING_UP and ("TRIG" in sens["x_max"]) and (current_time > wait):
             if DEBUG: print("sensor indicates card on board")
             robot.CARD_CARRIED = True
             robot.PICKING_UP = False
