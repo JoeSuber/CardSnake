@@ -422,12 +422,12 @@ def main():
                         TRIP = 1
                     msg = ", and nothing new added to matcher(len={}) GRIP={}, TRIP={}"\
                         .format(old_cardlist_len, GRIP, TRIP)
-
                 if DEBUG: print("No luck: {} fails{}".format(id_failure_cnt, msg))
             if len(bestmatch) > 1:
                 GRIP = 1
                 print("Has {} candidates".format(len(bestmatch)))
             if (id_failure_cnt > MAX_FAILS) and not bestmatch:
+                # send the card to the unidentified group/bin
                 cardlist, GRIP, TRIP = [], 1, 1
                 matcher.clear()
                 robot.ID_DONE = True
