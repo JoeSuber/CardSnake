@@ -169,12 +169,12 @@ class Robot(object):
                    'end_stop_status': 'M119',
                    'positions': 'M114',
                    'stop': 'M410'}
-        self.times = {'pickup_pos': 2.7,
-                      'drop_pos': 2.7,
+        self.times = {'pickup_pos': 3,
+                      'drop_pos': 3,
                       'fan_on': 0.1,
                       'fan_off': 0.1,
                       'servo_drop': 0.6,
-                      'servo_up': 1.0,
+                      'servo_up': 2.0,
                       'end_stop_status': 0.06,
                       'positions': 0.06,
                       'stop': 0.02}
@@ -257,16 +257,21 @@ class Robot(object):
         # print("actual speed: {}, ret: {}".format(time.time() - start, finalwait))
         return xyz_dict or self.xyz_pos(min_ret=min_ret-1)
 
-    def go_xz(self, bin_name, timeconst=0.043):
+    def go_xz(self, bin_name, timeconst=0.043, reverse=False):
         """given a destination bin, position everything for the drop, while decrementing for the next drop into the bin and
         return the estimated time from the present when the drop can happen"""
+        back = 1 if not reverse else -1
         newz = float(self.bins[bin_name])
-        self.bins[bin_name] -= self.bin_sliver
+        self.bins[bin_name] -= (self.bin_sliver * back)
         curz = self.xyz_pos()['Z']
-        x_spot = self.do['drop_pos'].split(' ')[1]
+        if not reverse:
+            x_spot = self.do['drop_pos'].split(' ')[1]
+            x_time = self.times['drop_pos']
+        else:
+            x_time, x_spot = 0, ""
         z_time = abs(curz - newz) * timeconst
         self.dothis("G1 Z" + str(newz) + " " + x_spot)
-        return z_time if z_time > self.times['drop_pos'] else self.times['drop_pos']
+        return z_time if z_time > x_time else x_time
 
     def hopper_up(self, y_current=None, bite=1.1, timeconst=0.7):
         """ raise the input hopper by a little bit, return the seconds it is estimated to take"""
@@ -346,6 +351,7 @@ def main():
     RUN_FAN = False
     GRIP, TRIP = 1, 1
     ROBOGO = False
+    BIN_REVERSE = False
     cardlist = []
     smile = orientation.Simile(just_faces=False)
     pathfront = orientation.peep.__mtgpics__
@@ -450,15 +456,16 @@ def main():
         # with card identified, begin moving the robot
         current_time = time.time()
 
-        if robot.ID_DONE and (not robot.PICKING_UP) and (current_time > wait):
+        if robot.ID_DONE and (not robot.PICKING_UP) and (not robot.NEED_DROP) and (current_time > wait):
             if DEBUG: print("moving arm over hopper")
             wait = robot.dothis("pickup_pos") + time.time()
+            wait += robot.dothis("servo_up")
             robot.PICKING_UP = True
 
         sens = robot.sensor_stats()
+        # if DEBUG: print("{}".format(sens))
         if robot.PICKING_UP and (current_time > wait):
             if DEBUG: print("checking that hopper is high enough")
-
             if "op" in sens['y_max']:
                 if DEBUG: print("raising hopper by default amount")
                 wait = robot.hopper_up() + time.time()
@@ -467,18 +474,17 @@ def main():
                 robot.hopper_up(0.1)
                 nudge_count += 1
 
-        if robot.PICKING_UP and (current_time > wait):
-            if DEBUG: print("suck card from top of hopper")
-            wait = robot.dothis("servo_up") + time.time()
+        #if robot.PICKING_UP and (current_time > wait):
+        #    if DEBUG: print("suck card from top of hopper, {}".format(",".join([k+","+v for k, v in sens.viewitems()])))
+        #    wait = robot.dothis("servo_up") + time.time()
 
         if robot.PICKING_UP and ("TRIG" in sens["x_max"]) and (current_time > wait):
             if DEBUG: print("sensor indicates card on board")
-            wait = time.time() + 0.01
             robot.CARD_CARRIED = True
             robot.PICKING_UP = False
 
         if robot.CARD_CARRIED and (current_time > wait):
-            if DEBUG: print("Card is moving out for bin drop")
+            if DEBUG: print("card is moving out for bin drop")
             wait = robot.go_xz(bin_name) + time.time()
             robot.CARD_CARRIED = False
             robot.PICKING_UP = False
@@ -489,14 +495,14 @@ def main():
             sens = robot.sensor_stats()
             if "op" in sens['x_max']:
                 if DEBUG: print("*** arrived at drop zone empty! *** going back to get card")
+                wait = robot.hopper_up(0.1) + time.time() + robot.go_xz(bin_name, reverse=True)
                 robot.NEED_DROP = False
             else:
                 if DEBUG: print("Dropping card into bin")
                 wait = robot.dothis('servo_drop') + time.time()
                 robot.NEED_DROP = False
                 robot.ID_DONE = False
-                robot.PICKING_UP = False
-            
+
 
 if __name__ == "__main__":
     exit(main())
