@@ -154,7 +154,7 @@ class Robot(object):
     """
     for initializing and running the interface between cpu and robot firmware via serial link
     """
-    def __init__(self, baud='115200', port='/dev/ttyACM0', readtimer=0, nl='\n', LOAD=True):
+    def __init__(self, baud='115200', port='/dev/ttyACM2', readtimer=0, nl='\n', LOAD=True):
         self.baud = baud
         self.port = port
         self.con = ser.Serial(port=port, baudrate=baud, timeout=readtimer)
@@ -228,11 +228,11 @@ class Robot(object):
         """returns dict of end-stop sensors, keyed by sensor name, with values of 'open' or 'TRIGGERED'"""
         extra_time = 0
         if retry > 5:
-            extra_time = 0.05*retry
-            print(extra_time)
-        if retry > 12:
+            extra_time = 0.1 * retry
+            print("extra time: {} sec".format(extra_time))
+        if retry > 32:
             print("too many retries of sensors = {}".format(retry))
-            return {}
+            return {'y_max': "TRIGGERED", 'x_max': 'y_is_fake!'}
 
         wait = self.dothis('end_stop_status') + time.time() + extra_time
         while (time.time() < wait) and (self.con.inWaiting() < min_ret):
@@ -296,12 +296,16 @@ class Robot(object):
         """ load cards until bottom switch is triggered, indicating max capacity, but only move
         down while top proximity sensor is triggered. Set self.LOADING false when done"""
         # first move up until proximity sensor is triggered to get the platform up top
-        print("Movin' on up (until top sensor triggered)")
+        print(" - Initializing hopper upwards (until top sensor triggered) - ")
         self.dothis("G0 Y{}".format(y_top))
+        power_warn_time = time.time() + 22.0
         INITIALIZE_UP = True
         while INITIALIZE_UP:
             sensor = self.sensor_stats()
-            print(sensor)
+            if time.time() > power_warn_time:
+                power_warn_time = time.time() + 2.0
+                print("Is the power-supply on? If not, break and start over.")
+                print("sensors say: {}".format(sensor))
             if 'TRIG' in sensor['y_max']:
                 print("top sensor = {}".format(sensor['y_max']))
                 time.sleep(self.dothis("stop"))
@@ -369,6 +373,7 @@ def main():
     cam = cv2.VideoCapture(0)
     time.sleep(6)
     wait = time.time()
+    print(" -- Loading Hopper --")
     robot.load_hopper()
     bin_name = robot.bin_lookup(0.0)
     old_window = ""

@@ -13,6 +13,8 @@ const bool Y_MAX_ENDSTOP_INVERTING = true; // set to true to invert the logic of
 const bool Z_MAX_ENDSTOP_INVERTING = true; // set to true to invert the logic of the endstop.
 const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the logic of the endstop.
 
+// also had to copy file: /travis/RAMPS_14_EFB... to /travis/RAMPS_13_EFB...
+
 // to use this file the following lines are modified in 'FirmwareCustomization.h'
 
 #if 1
@@ -27,9 +29,12 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 
 #define CUSTOMIZATION_H
 #define UUID "4faf695a-cb35-4e2b-b5af-62107b61823f"
-#define STRING_CONFIG_H_AUTHOR "Joe Suber"
+#define STRING_CONFIG_H_AUTHOR "Joseph Suber"
 #define CUSTOM_MACHINE_NAME "Magic Robot"
 
+// #define MOTHERBOARD BOARD_RAMPS_13_EFB      // 33  // RAMPS 1.3 (Power outputs: Extruder0, Fan, Bed)
+// turns out this uses pin7 for servo0, where it used to be pin11, so we stay with RAMPS_14 to stay with pin11
+#define BAUDRATE 115200
 // fake out the temp monitor so that we can do "print" moves without restrictions
 #define DUMMY_THERMISTOR_998_VALUE 230
 #define DUMMY_THERMISTOR_999_VALUE 100
