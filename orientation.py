@@ -268,7 +268,7 @@ class Simile(object):
         return list1
 
     def updown(self, img, rng=(4, 18)):
-        """ for testing different efficient ways of telling up from down """
+        """ for testing different efficient ways of telling up from downc """
         dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         dd = {}
         for dist in xrange(rng[0], rng[1]):
@@ -296,7 +296,7 @@ class Simile(object):
         for dist in xrange(6 + trips, 20):
             ups = np.sum(self.gmp_hamm(self.ups,  dct) < dist)
             downs = np.sum(self.gmp_hamm(self.dwn,  dct) < dist)
-            print("{:3}:  ups {},  downs {}".format(dist, ups, downs))
+            # print("{:3}:  ups {},  downs {}".format(dist, ups, downs))
             if ups == downs:
                 continue
             if (ups > (3 - trips)) and (ups > (downs - trips)):

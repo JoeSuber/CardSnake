@@ -376,7 +376,7 @@ def main():
     # # # # # # #
 
     populate_links(card_counts(__db_card_count__.keys()[0]))
-    trying = 100
+    trying = 7
     remains = len(it)
     baddies = []
     print("attempting to get {} per download run:".format(trying))
