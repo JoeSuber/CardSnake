@@ -91,10 +91,10 @@ class Posts(object):
         self.xc = xc
         self.yc = yc
         # these hard-coded corner values are just starting points, and are adjustable
-        self.p1 = (517, 101)
-        self.p2 = (541, 368)
-        self.p3 = (136, 385)
-        self.p4 = (136, 101)
+        self.p1 = (536, 79)
+        self.p2 = (554, 365)
+        self.p3 = (137, 377)
+        self.p4 = (134, 85)
         self.lines = [2, 2, 2, 2]
         self.colors = [(0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 255, 255)]
         self.radii = [5, 5, 5, 5]
@@ -201,10 +201,13 @@ class Robot(object):
         self.bin_cuts = OrderedDict([('Low', 0.0), ('High', 0.5), ('NoID', 10000.0)])
         self.bin_sliver = 0.2
         self.LOADING = True
-        tl = self.con.readline()
-        while tl:
-            print("startup: {}".format(tl.strip()))
-            tl = self.con.readline()
+        #tl = self.con.readline()
+        #while tl:
+        #    print("startup: {}".format(tl.strip()))
+        #    tl = self.con.readline()
+        r = self.con.read(self.con.inWaiting())
+        for p in r.split('echo:'):
+            print p
 
     def dothis(self, instruction):
         """ sends instruction to robot and returns the estimated execution time if available """
@@ -226,6 +229,7 @@ class Robot(object):
         extra_time = 0
         if retry > 5:
             extra_time = 0.05*retry
+            print(extra_time)
         if retry > 12:
             print("too many retries of sensors = {}".format(retry))
             return {}
@@ -297,6 +301,7 @@ class Robot(object):
         INITIALIZE_UP = True
         while INITIALIZE_UP:
             sensor = self.sensor_stats()
+            print(sensor)
             if 'TRIG' in sensor['y_max']:
                 print("top sensor = {}".format(sensor['y_max']))
                 time.sleep(self.dothis("stop"))
@@ -350,8 +355,8 @@ def main():
     DEBUG = True
     nudge_count = 0
     MIN_MATCHES = 13
-    MAX_ITEMS = 600
-    MAX_FAILS = 100
+    MAX_ITEMS = 8
+    MAX_FAILS = 40
     RUN_FAN = False
     GRIP, TRIP = 1, 1
     ROBOGO = False
@@ -421,15 +426,15 @@ def main():
                 msg = ""
                 if (len(cardlist) == old_cardlist_len):
                     GRIP += 1
-                    TRIP += np.random.randint(-1, 2)
-                    if (TRIP > 2) or (TRIP < 0):
+                    TRIP += np.random.randint(-1, 3)
+                    if (TRIP > 4) or (TRIP < 0):
                         TRIP = 1
                     msg = ", and nothing new added to matcher(len={}) GRIP={}, TRIP={}"\
                         .format(old_cardlist_len, GRIP, TRIP)
                 if DEBUG: print("No luck: {} fails{}".format(id_failure_cnt, msg))
             if len(bestmatch) > 1:
                 GRIP = 1
-                print("Has {} candidates".format(len(bestmatch)))
+                if DEBUG: print("Has {} candidates".format(len(bestmatch)))
             if (id_failure_cnt > MAX_FAILS) and not bestmatch:
                 # send the card to the unidentified group/bin
                 cardlist, GRIP, TRIP = [], 1, 1

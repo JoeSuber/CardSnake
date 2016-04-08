@@ -539,12 +539,12 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 // default settings
 
 #define DEFAULT_AXIS_STEPS_PER_UNIT   {100,13589,1297,500}  // steps per unit {60,10464,1310,500}
-#define DEFAULT_MAX_FEEDRATE          {600,30,100,25}    // (mm/sec){300,8,17,25} {600,9,30,25}
+#define DEFAULT_MAX_FEEDRATE          {600,9,17,25}    // (mm/sec){300,8,17,25} {600,9,30,25}
 #define DEFAULT_MAX_ACCELERATION      {170,100,150,10000}    //  {100,150,150,10000}  X, Y, Z, E maximum start speed for accelerated moves. {100,150,150,10000}
 
-#define DEFAULT_ACCELERATION          4000    // X, Y, Z and E acceleration in mm/s^2 for printing moves
+#define DEFAULT_ACCELERATION          3000    // X, Y, Z and E acceleration in mm/s^2 for printing moves
 #define DEFAULT_RETRACT_ACCELERATION  3000    // E acceleration in mm/s^2 for retracts
-#define DEFAULT_TRAVEL_ACCELERATION   4000    // X, Y, Z acceleration in mm/s^2 for travel (non printing) moves
+#define DEFAULT_TRAVEL_ACCELERATION   3000    // X, Y, Z acceleration in mm/s^2 for travel (non printing) moves
 
 // The speed change that does not require acceleration (i.e. the software might assume it can be done instantaneously)
 #define DEFAULT_XYJERK                2.0    // (mm/sec)
@@ -650,7 +650,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 // leaving it undefined or defining as 0 will disable the servo subsystem
 // If unsure, leave commented / disabled
 //
-#define NUM_SERVOS 1 // Servo index starts with 0 for M280 command
+#define NUM_SERVOS 3 // Servo index starts with 0 for M280 command
 
 // Servo Endstops
 //

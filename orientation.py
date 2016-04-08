@@ -238,11 +238,6 @@ class Simile(object):
     def hamm_down(self, dct, cutval):
         return self.ids[np.where(self.gmp_hamm(self.dwn,  dct) < cutval)]
 
-    def is_top(self, dct):
-        print "score ups:  ", np.sum(self.gmp_hamm(self.ups, dct))
-        print "score down: ", np.sum(self.gmp_hamm(self.dwn, dct))
-        return np.sum(self.gmp_hamm(self.ups, dct)) < np.sum(self.gmp_hamm(self.dwn, dct))
-
     def handful(self, img, flipit=15, dist=None):
         """
         img: full image probably lifted from a user input device
@@ -273,7 +268,7 @@ class Simile(object):
         return list1
 
     def updown(self, img, rng=(4, 18)):
-        """ for testing different efficient ways of telling up from down, shit from shine-ola """
+        """ for testing different efficient ways of telling up from down """
         dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
         dd = {}
         for dist in xrange(rng[0], rng[1]):
