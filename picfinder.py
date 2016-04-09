@@ -381,13 +381,39 @@ def main():
         baddies, remains = download_pics(attempt=trying, skip=baddies, remaining=remains)
 
     print("\n There are {} 'bad' items in the database: \n".format(len(baddies)))
-    print(" #  setcode:      card name:          local path:            web link:\n")
+    print(" #  setcode:    card name:             local path:             web link:\n")
     old_set = ""
     for n, q in enumerate(baddies):
         i = peep.card_db.cur.execute("SELECT code, name, pic_path, pic_link FROM cards WHERE id=?", (q,)).fetchone()
+        if i['code'] != old_set:
+            old_set = i['code']
+            s = peep.set_db.cur.execute("""SELECT name, magicCardsInfoCode, mkm_name,
+                                        gathererCode, onlineOnly FROM set_infos WHERE code=?""", (old_set,)).fetchone()
+            print(" - ")
+            try:
+                print("* {} ***".format(", ".join(map(lambda x: x[0]+": "+x[1], zip(s.keys(), [(s[n] or '0')
+                                                                                    for n, _ in enumerate(s)])))))
+            except (TypeError, AttributeError):
+                print("does this set code exist? -> {}".format(old_set))
         print("{:6}: {:5} - {:28} - {:15} - link: {}".format(n+1, i['code'], i['name'], i['pic_path'], i['pic_link']))
 
     return 1
-
+"""
+'code',
+ 'name',
+ 'magicCardsInfoCode',
+ 'border',
+ 'oldCode',
+ 'translations',
+ 'mkm_id',
+ 'releaseDate',
+ 'onlineOnly',
+ 'magicRaritiesCodes',
+ 'gathererCode',
+ 'type',
+ 'block',
+ 'mkm_name',
+ 'card_count']
+ """
 if __name__ == "__main__":
     exit(main())
