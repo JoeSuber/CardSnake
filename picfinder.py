@@ -368,7 +368,7 @@ def main():
     #print peep.card_db.show_columns(peep.__cards_t__)
     it = peep.card_db.cur.execute("SELECT id, name, code, pic_link FROM cards").fetchall()
 
-    populate_links(card_counts(__db_card_count__.keys()[0]))
+    #populate_links(card_counts(__db_card_count__.keys()[0]))
 
     trying = 7
     remains = len(it)
@@ -379,10 +379,13 @@ def main():
     while (remains - len(baddies)) > 0:
         print("{:7} remain".format(remains - len(baddies)))
         baddies, remains = download_pics(attempt=trying, skip=baddies, remaining=remains)
-    
+
     print("\n There are {} 'bad' items in the database: \n".format(len(baddies)))
-    for i in peep.card_db.cur.executemany("SELECT code, name, pic_path, pic_link FROM cards WHERE id = ?", baddies):
-        print("{:3} - {:30} - {:15} - {}".format(i['code'], i['name'], i['pic_path'], i['pic_link']))
+    print(" #  setcode:      card name:          local path:            web link:\n")
+    old_set = ""
+    for n, q in enumerate(baddies):
+        i = peep.card_db.cur.execute("SELECT code, name, pic_path, pic_link FROM cards WHERE id=?", (q,)).fetchone()
+        print("{:6}: {:5} - {:28} - {:15} - link: {}".format(n+1, i['code'], i['name'], i['pic_path'], i['pic_link']))
 
     return 1
 
