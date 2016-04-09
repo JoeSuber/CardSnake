@@ -123,11 +123,14 @@ def add_dct_data(cardpaths):
                 print("{} new pics dct'd".format(counter))
             shortpath = os.path.sep.join(fsp.split(os.path.sep)[-2:])
             im = cv2.equalizeHist(cv2.imread(fsp, cv2.IMREAD_GRAYSCALE))
-            flim = im[::-1, ::-1]
-            height, width = im.shape[:2]
-            datas.append({'id': idc, 'picpath': shortpath,
+            try:
+                flim = im[::-1, ::-1]
+                height, width = im.shape[:2]
+                datas.append({'id': idc, 'picpath': shortpath,
                           'top_dct': gmpy2.digits(dct_hint(im[:width * __RAT__, :])),
                           'bot_dct': gmpy2.digits(dct_hint(flim[:width * __RAT__, :]))})
+            except TypeError as e:
+                print("{} No picture was loaded for path: {}".format(e, fsp))
     print("{} new pics dct'd".format(counter))
     print("adding {} new lines of data to orient from {} card-paths".format(len(datas), len(cardpaths)))
     if datas:
