@@ -267,10 +267,11 @@ def populate_links(setcodes):
     peep.card_db.con.commit()
 
 
-def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=None):
+def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=None, remaining=0):
     """
     to avoid blasting the web-server with grequests, check for valid local pictures a few at a time.
-    Get the missing pics using the pic_link.  Update the database.
+    Get the missing pics using the pic_link.  Also validate the db has links to pics already in the local
+    file-system without re-downloading them. Update the database.
     """
     if skip is None:
         skip = []
@@ -278,7 +279,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
     usql = '''UPDATE {} SET pic_path=? WHERE id=?'''.format(peep.__cards_t__)
     work = db.cur.execute(sql).fetchall()
     real_work = []
-    needed_ids, needed_local_paths, needed_links, file_exists = [], [], [], []
+    needed_ids, needed_local_paths, needed_links = [], [], []
     new_dirs = Counter()
 
     # first filter out some causes of errors
@@ -286,11 +287,12 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
         # are we supposed to skip it (bad link already tried, etc)?
         if w['id'] in skip:
             continue
-        # is there a link?
+        # is there a web-link to a picture?
         if not w['pic_link']:
             # print ("NO PIC LINK: {} of {}".format(w['name'], w['code']))
+            skip.append(w['id'])
             continue
-        # is the required file present and not empty?
+        # is the pic_path already pointing to a file that is present and not empty?
         if w['pic_path']:
             prospect = os.path.join(fs_stub, w['pic_path'])
             if os.path.isfile(prospect) and os.stat(prospect).st_size > 10:
@@ -298,24 +300,26 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
         # if none of above, add to real_work
         real_work.append(w)
 
-    quant_left = len(real_work)
+    work_pool = len(real_work)
+    successes = 0
     # go to work on (some portion of) real work
-    for w in real_work[:min(attempt, quant_left)]:
+    for w in real_work[:min(attempt, work_pool)]:
         # windows compatibility hack (win OS hates the string 'CON'):
         tag = ''
         if (w['code'] == 'CON') and ('nt' in os.name):
             tag = 'win'
-        # preserve unique origination information in the filename:
+        # preserve unique web origination information and local setcode in the filename:
         q = os.path.join(fs_stub, w['code'] + tag, "".join(w['pic_link'].split("/")[-2:]))
-        # in case the database held path was deleted, but localpic file is still here...
-        if os.path.isfile(q) and os.stat(q).st_size > 10:
-            file_exists.append(True)
+        if not (os.path.isfile(q) and os.stat(q).st_size > 10):
+            needed_local_paths.append(q)
+            needed_ids.append(w['id'])
+            needed_links.append(w['pic_link'])
+            new_dirs[os.path.join(fs_stub, w['code'] + tag)] += 1
         else:
-            file_exists.append(False)
-        needed_local_paths.append(q)
-        needed_ids.append(w['id'])
-        needed_links.append(w['pic_link'])
-        new_dirs[os.path.join(fs_stub, w['code'] + tag)] += 1
+            # the database held path was deleted, but there is a valid local pic file
+            # enter into db the local path info where it has apparently gone missing
+            successes += 1
+            db.cur.execute(usql, (os.path.join(q.split(os.path.sep)[-2:]), w['id']))
 
     # check that all file-names are unique
     try:
@@ -337,20 +341,15 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
 
     # prepare & send work to grequests
     reqs = (grequests.get(u) for u in needed_links)
-    resps = grequests.map(reqs)
-
-    successes = 0
 
     # take responses and turn into binary image files, record success in database by recording fs path
-    for num, (lp, dbid, rsp, here) in enumerate(izip(needed_local_paths, needed_ids, resps, file_exists)):
+    for lp, dbid, rsp in izip(needed_local_paths, needed_ids, grequests.map(reqs)):
         if rsp.status_code == 200:
             try:
-                if not here:
-                    with open(lp, 'wb') as fob:
-                        for chunk in rsp.iter_content(1024):
-                            fob.write(chunk)
-                a, b = lp.split(os.path.sep)[-2:]
-                db.cur.execute(usql, (os.path.join(a, b), dbid))
+                with open(lp, 'wb') as fob:
+                    for chunk in rsp.iter_content(1024):
+                        fob.write(chunk)
+                db.cur.execute(usql, (os.path.join(lp.split(os.path.sep)[-2:]), dbid))
                 successes += 1
             except Exception as e:
                 print(e)
@@ -359,8 +358,7 @@ def download_pics(db=peep.card_db, fs_stub=peep.__mtgpics__, attempt=100, skip=N
             skip.append(dbid)
 
     db.con.commit()
-    print("{} more pics needed".format(quant_left-successes))
-    return skip, quant_left - successes
+    return skip, work_pool - successes
 
 
 def main():
@@ -370,25 +368,22 @@ def main():
     #print peep.card_db.show_columns(peep.__cards_t__)
     it = peep.card_db.cur.execute("SELECT id, name, code, pic_link FROM cards").fetchall()
 
-    # for testing populate_links
-    #peep.set_db.cur.execute("UPDATE set_infos SET card_count=0")
-    #peep.card_db.con.commit()
-    # # # # # # #
-
     populate_links(card_counts(__db_card_count__.keys()[0]))
+    
     trying = 7
     remains = len(it)
     baddies = []
-    print("attempting to get {} per download run:".format(trying))
-    while remains > 0:
-        bad, remains = download_pics(attempt=trying, skip=baddies)
-        if bad:
-            baddies.append(bad)
+    #
+    print("attempting {} per download run:".format(trying))
+    while (remains - len(baddies)) > 0:
+        print("{:7} remain".format(remains - len(baddies)))
+        baddies, remains = download_pics(attempt=trying, skip=baddies, remaining=remains)
 
     for bad in baddies:
         for i in it:
             if i['id'] == bad:
                 print("404, bad link: {} - {}".format(i['name'], i['pic_link']))
+
     return 1
 
 if __name__ == "__main__":

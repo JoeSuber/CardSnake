@@ -296,7 +296,7 @@ class Simile(object):
         # uses pre-calculated "downs" to avoid doing two dcts on sample, and can exit early very often
         # also tries to return more than 1 result in an effort to give the matcher some options
         dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
-        for dist in xrange(6 + trips, 20):
+        for dist in xrange(6, 20):
             ups = np.sum(self.gmp_hamm(self.ups,  dct) < dist)
             downs = np.sum(self.gmp_hamm(self.dwn,  dct) < dist)
             # print("{:3}:  ups {},  downs {}".format(dist, ups, downs))
@@ -380,11 +380,16 @@ def run_akazer(workchunk=100, db=orient_db, dbtable='orient', columns='ak_points
     else:
         needed = db.cur.execute("SELECT id, picpath FROM {} WHERE picpath IS NOT NULL and {} IS NULL"
                                 .format(dbtable, pntcol)).fetchmany(size=workchunk)
-    if len(needed) < 1:
+        # remove missing paths
+    cardstack = {}
+    for want in needed:
+        full_path = os.path.join(fs, want['picpath'])
+        if os.path.isfile(full_path):
+            cardstack[want['id']] = full_path
+    if not cardstack:
         print("finished adding keypoint and descriptor data")
         return 0
-    cardstack = {want['id']: os.path.join(fs, want['picpath']) for want in needed}
-    with Timer(msg="processing {} new items".format(workchunk)):
+    with Timer(msg="processing {} new items".format(len(cardstack))):
         dataa = akazer(pics=cardstack, columns=columns)
         if ADD_COLUMNS:
             db.add_columns(dbtable, peep.column_type_parser(dataa))
