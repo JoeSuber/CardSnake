@@ -478,7 +478,7 @@ def main():
         if robot.ID_DONE and (not robot.PICKING_UP) and (not robot.NEED_DROP) and (current_time > wait):
             if DEBUG: print("moving arm over hopper")
             wait = robot.dothis("pickup_pos") + time.time()
-            wait += robot.dothis("servo_up")
+            wait += (robot.dothis("servo_up") * 0.5)
             robot.PICKING_UP = True
 
         sens = robot.sensor_stats()
