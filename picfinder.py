@@ -4,7 +4,7 @@
 """
 The json data for magic sets is splotchy at best. If card numbers are present, they are used,
 but matching picture titles to names is often required even though many different cards share the same name!
-Even inside set of cards this can be the case (Swamp, Swamp, Swamp).
+Even inside sets of cards this can be the case (Swamp, Swamp, Swamp).
 Sometimes names don't match due to differences in unicode-points or even typos.
 Levenshtein distance is the last resort to try and get the unique match to a picture-link.
 
@@ -368,7 +368,7 @@ def main():
     #print peep.card_db.show_columns(peep.__cards_t__)
     it = peep.card_db.cur.execute("SELECT id, name, code, pic_link FROM cards").fetchall()
 
-    #populate_links(card_counts(__db_card_count__.keys()[0]))
+    populate_links(card_counts(__db_card_count__.keys()[0]))
 
     trying = 7
     remains = len(it)
