@@ -369,20 +369,20 @@ def main():
     it = peep.card_db.cur.execute("SELECT id, name, code, pic_link FROM cards").fetchall()
 
     populate_links(card_counts(__db_card_count__.keys()[0]))
-    
+
     trying = 7
     remains = len(it)
     baddies = []
     #
     print("attempting {} per download run:".format(trying))
+
     while (remains - len(baddies)) > 0:
         print("{:7} remain".format(remains - len(baddies)))
         baddies, remains = download_pics(attempt=trying, skip=baddies, remaining=remains)
-
-    for bad in baddies:
-        for i in it:
-            if i['id'] == bad:
-                print("404, bad link: {} - {}".format(i['name'], i['pic_link']))
+    
+    print("\n There are {} 'bad' items in the database: \n".format(len(baddies)))
+    for i in peep.card_db.cur.executemany("SELECT code, name, pic_path, pic_link FROM cards WHERE id = ?", baddies):
+        print("{:3} - {:30} - {:15} - {}".format(i['code'], i['name'], i['pic_path'], i['pic_link']))
 
     return 1
 
