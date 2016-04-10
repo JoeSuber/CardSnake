@@ -154,7 +154,7 @@ class Robot(object):
     """
     for initializing and running the interface between cpu and robot firmware via serial link
     """
-    def __init__(self, baud='115200', port='/dev/ttyACM2', readtimer=0, nl='\n', LOAD=True):
+    def __init__(self, baud='115200', port='/dev/ttyACM0', readtimer=0, nl='\n', LOAD=True):
         self.baud = baud
         self.port = port
         self.con = ser.Serial(port=port, baudrate=baud, timeout=readtimer)
@@ -182,7 +182,7 @@ class Robot(object):
         for w in xrange(5):
             print("waiting {} seconds to init serial".format(5 - w))
             time.sleep(1)
-        print("serial port: {}   isOpen={}".format(self.con.getPort(), self.con.isOpen()))
+        print("serial portisOpen={}".format(self.con.isOpen()))
         # physically home X (arm) Y (hopper) and Z (output bin) to zero positions
         self.con.write("G28 XZ" + nl)
         self.con.write("G28 Y" + nl)

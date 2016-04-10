@@ -282,7 +282,7 @@ class Simile(object):
         """ replaces handful with a rube-goldberg machine """
         if trips > 2:
             # always gives at least one result but always uses the same quantity of costly operations
-            dcts = [dct_hint(cv2.equalizeHist(cv2.cvtColor(im[:im.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+            dcts = [dct_hint(cv2.equalizeHist(cv2.cvtColor(im[:int(im.shape[1] * __RAT__), :], cv2.COLOR_BGR2GRAY)))
                     for im in [img, img[::-1, ::-1]]]
             start, uplist = 5, {}
             # counting the zeroes determines the quality of each list (fewer=better) and
@@ -295,7 +295,7 @@ class Simile(object):
 
         # uses pre-calculated "downs" to avoid doing two dcts on sample, and can exit early very often
         # also tries to return more than 1 result in an effort to give the matcher some options
-        dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:img.shape[1] * __RAT__, :], cv2.COLOR_BGR2GRAY)))
+        dct = dct_hint(cv2.equalizeHist(cv2.cvtColor(img[:int(img.shape[1] * __RAT__), :], cv2.COLOR_BGR2GRAY)))
         for dist in xrange(6, 20):
             ups = np.sum(self.gmp_hamm(self.ups,  dct) < dist)
             downs = np.sum(self.gmp_hamm(self.dwn,  dct) < dist)
