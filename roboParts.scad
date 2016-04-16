@@ -1,6 +1,6 @@
 use </home/suber1/openscad/libraries/MCAD/motors.scad>;
 use </home/suber1/openscad/libraries/MCAD/involute_gears.scad>;
-use <cogs.scad>;
+use </home/suber1/openscad/libraries/cogs.scad>;
 
 panel_thickness = 7.7;
 bin_width = 63.6;
@@ -43,7 +43,7 @@ module input_tray(length=650){
     echo("bottom of input tray cut to width =",bot_width);
     echo("sides are ",side_h, " wide and ", length, " long");
     
-    // 
+    //  
     for (i=[0,1]){
         mirror([0,i,0])
             translate([0,card_w/2 + thk, 0])
@@ -104,14 +104,76 @@ module input_tray(length=650){
     echo("motor mount center at x, y", -bot_len/2+motor_shaft+5.1,motor_face*1.5 + thk);
     translate([-bot_len/2+motor_shaft,0,motor_face*1.5 + thk]) rotate([0,90,0])
         motor_mount();
+    // rails
+    railroad();
+    belt_calc();
 }
  
 module check(yforward=79.2/2){
-    measures=[285.8,-266.4,313.25,-313.25,309.25,-309.25, -193.76, -273.5+5.1];
+    measures=[285.8, 285.8-(274.6/2), 285.8-274.6, -266.4,313.25,-313.25,309.25,-309.25, -193.76, -273.5+5.1];
+    ymeasures=[28-17.95, 28+17.95, 13.75, 49.85, 112, 78.65, 91.9, 91.9+29.8, 91.9-29.8];
+    echo("ymeasures =",ymeasures);
+    echo("xmeasures =",measures);
     side_h=153;
     for (i=measures){
         translate([i, yforward,0])
             #cylinder(r=.5, h=side_h);
+    }
+    for (i=ymeasures){
+        translate([0, yforward, i])
+            rotate([0,90,0])
+            #cylinder(r=.5, h=650, center=true);
+    }  
+}
+
+module belt_calc(){
+    belt=1440;
+    r1=46.15;
+    roundpart=r1*2*3.141592654;
+    betweenpart= (belt - roundpart) /2;
+    echo("from center to center, belt stretches:", betweenpart);
+}
+    
+module railroad(x1=285.8, y1=45.95, wheelrad=46.15, gap=45){
+    //module mybiggercog() must determine wheelrad to get evenly spaced cogs
+    echo("back sprocket",-wheelrad*4-2*gap,"behind front");
+            translate([x1, 79.2/2, y1]) rotate([-90,0,0]) 
+                for (i=[0, -wheelrad*4-(2*gap)]){
+                    translate([i, 0, 8])
+                        sprocket(rad=wheelrad, ht=10.2, bearing_rad=11.2, ang=-180);
+                }
+}
+
+module sprocket(rad=46.15, ht=10.2, bearing_rad=11.2, ang=-90, with_arm=0){
+    // module mybiggercog() must determine wheelrad to get evenly spaced cogs
+    support_offset_angle=180;
+    belt_width = 7.2;
+    edges = (ht - belt_width) / 2;
+    swing_len = rad - bearing_rad - 2.4;
+    echo("arm travel through 180 deg = ", swing_len*2);
+    difference(){
+        union(){
+            mybiggercog(edges=edges, cogh=belt_width, outside_rad=rad);
+            if (with_arm==1){
+            translate([(swing_len)*cos(ang), (swing_len)*sin(ang), -4]){
+                cube([25, 24, 8], center=true);
+                translate([0, -24, 0])
+                    cube([180, 24, 8], center=true);
+                }
+            }
+        }
+        //center axis bearing cutout
+        cylinder(r=bearing_rad - 2.5, h=ht*2, center=true);
+        cylinder(r=bearing_rad, h=8, $fn=48);
+        
+        // arm axis attachment w/ bearing
+        for (i=[0:60:360]){
+            translate([swing_len*cos(ang+i), swing_len*sin(ang+i), 0]){
+                cylinder(r=bearing_rad - 2.5, h=ht*2, $fn=16);
+                translate([0,0,0])
+                    cylinder(r=bearing_rad, h=8, $fn=48);
+            }
+        }
     }
 }
 
@@ -183,7 +245,7 @@ module roller(wdth=62, bearing_d=22.3, bearing_h=8, shaft_d=8.6, showshaft=0){
         }
  }
 
-module cardstack(quant=1000){
+module cardstack(quant=1200){
     w=63;
     l=88;
     thk=18.7/60.0;
