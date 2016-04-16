@@ -54,6 +54,19 @@ module mybigcog(wheel_height=15){
         }
 }
 
+module mybiggercog(edges=1.5, cogh=7.2, outside_rad=46.15){
+    adj = 0.0;
+    rad = outside_rad;
+    wheel_height = edges*2 + cogh;
+    //cube([outside_rad*2, outside_rad*2, 2], center=true);
+    translate([0, -rad-adj, wheel_height/2])
+        difference(){
+            translate([0,rad-adj,-wheel_height/2])
+                cylinder(r=rad, h=wheel_height, $fn=512);
+            belt_angle(prf = tT5, rad=rad-adj, bwdth = cogh, angle=360, $fn=256);
+        }
+}
+
 module test_belt() {
 	translate([-00.5,0,5.5])cube([1,40,1]);
 	
