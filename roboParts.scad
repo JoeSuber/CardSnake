@@ -178,8 +178,15 @@ module sprocket(rad=46.15, ht=10.2, bearing_rad=11.2, ang=-90, with_arm=0){
 }
 
 module brass(ht=bearing_block_thk+0.1){
-     cylinder(r=25.5/2, h=3.2, $fn=64);
-     cylinder(r=19.35/2, h=ht, $fn=64);
+     cylinder(r=25.9/2, h=3.2, $fn=64);
+     cylinder(r=19.6/2, h=ht, $fn=64);
+}
+
+module bearing_sleeve(){
+    difference(){
+        cylinder(r=7.93/2, h=16, $fn=64);
+        cylinder(r=6.3/2, h=16.1, $fn=64);
+    }
 }
 
 module bolt(length=bin_width+panel_thickness*2+12, shft=6.3/2, hd=12.8/2, thk=panel_thickness){
@@ -209,11 +216,7 @@ module bearing_block(w=bin_width, ht=bearing_block_thk, p=panel_thickness){
                 #limit_switch();
             }
         }
-        // cut-outs for roller clearance
-        for (i=[14.3, -22]){
-            translate([i,0,31])
-                roller(showshaft=0);
-        }
+
 
     }
 }
