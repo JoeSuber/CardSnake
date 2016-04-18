@@ -184,8 +184,8 @@ module brass(ht=bearing_block_thk+0.1){
 
 module bearing_sleeve(){
     difference(){
-        cylinder(r=7.93/2, h=16, $fn=64);
-        cylinder(r=6.3/2, h=16.1, $fn=64);
+        cylinder(r=7.917/2, h=16, $fn=64);
+        cylinder(r=6.8/2, h=16.1, $fn=64);
     }
 }
 
