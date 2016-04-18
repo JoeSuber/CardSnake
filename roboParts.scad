@@ -16,8 +16,9 @@ motor_face = 56;
 rotate([90,0,90])
 translate([0, 21+88, -77])
     #cardstack();
-input_tray();
+//input_tray();
 check();
+travler();
 //roller();
 //bearing_block();
 //limit_switch();
@@ -172,6 +173,40 @@ module sprocket(rad=46.15, ht=10.2, bearing_rad=11.2, ang=-90, with_arm=0){
                 cylinder(r=bearing_rad - 2.5, h=ht*2, $fn=16);
                 translate([0,0,0])
                     cylinder(r=bearing_rad, h=8, $fn=48);
+            }
+        }
+    }
+}
+
+module nut_on_thread(nut_rad=21.8/2, rod_rad=12.8/2){
+    cylinder(r=rod_rad, h=90, $fn=24, center=true);
+    cylinder(r=nut_rad, h=12.6, $fn=6, center=true);
+}
+    
+module bolt(ht=15, nut_ht=15){
+    translate([0,0,-ht/2]){
+        cylinder(h=ht, r=6.6/2, $fn=12);
+        cylinder(h=4, r=12.7/2, $fn=6);
+        translate([0,0,nut_ht-5.45])
+            cylinder(h=5.6, r=12.7/2, $fn=6);
+    }
+}
+
+module travler(center2slot=motor_face/2, plate_thick=2, nut_rad=21.8/2, border=2, along_rod=35){
+    difference(){
+        translate([center2slot/2 - nut_rad/2 - border/2,0,along_rod/2]){
+            cube([center2slot+nut_rad+border, nut_rad*2+border, along_rod], center=true);
+        }
+        translate([0,0,along_rod/2]){
+            #nut_on_thread(nut_rad=nut_rad);
+        }
+        translate([center2slot/2, 0, along_rod/2]){
+            cube([center2slot, plate_thick+0.1, along_rod], center=true);
+        }
+        for (i=[1.3,4.2]){
+            translate([center2slot/2+6, (nut_rad*2+border)/2, along_rod/i]){
+                 rotate([90, 0, 0])
+                    #bolt(ht=1);
             }
         }
     }
