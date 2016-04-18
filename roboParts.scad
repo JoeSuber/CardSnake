@@ -216,8 +216,6 @@ module bearing_block(w=bin_width, ht=bearing_block_thk, p=panel_thickness){
                 #limit_switch();
             }
         }
-
-
     }
 }
     
