@@ -17,8 +17,9 @@ rotate([90,0,90])
 translate([0, 21+88, -77])
     #cardstack();
 //input_tray();
-check();
-travler();
+//check();
+//travler();
+pusher();
 //roller();
 //bearing_block();
 //limit_switch();
@@ -208,6 +209,25 @@ module travler(center2slot=motor_face/2, plate_thick=2, nut_rad=21.8/2, border=2
                  rotate([90, 0, 0])
                     #bolt(ht=1);
             }
+        }
+    }
+}
+
+module pusher(plate_thick=3, plate_width=35, face_thk=3, face_wdth=47){
+    difference(){
+        cube([plate_width+face_thk*2, face_wdth, 70]);
+        // slot runner hole
+        translate([face_thk, (face_wdth-plate_thick)/2, 0])
+            cube([plate_width, plate_thick, 50]);
+        // tighteners
+        for (i=[face_wdth-(face_wdth*0.25), face_wdth*0.25]){
+            translate([0,i, 30])
+                rotate([0,90,0])
+                    #bolt(ht=55, nut_ht=55);
+        }
+        for (i=[0, face_wdth-8]){
+            translate([12, i, 0])
+                cube([0.6,8,70]);
         }
     }
 }
