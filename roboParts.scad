@@ -16,10 +16,10 @@ motor_face = 56;
 rotate([90,0,90])
 translate([0, 21+88, -77])
     #cardstack();
-//input_tray();
-//check();
+input_tray();
+check();
 //travler();
-pusher();
+//pusher();
 //roller();
 //bearing_block();
 //limit_switch();
