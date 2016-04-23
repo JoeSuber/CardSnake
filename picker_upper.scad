@@ -11,13 +11,16 @@ cupholder_gap = cupholder_wall + wallthk + fudge*2;
 cupholder_outside = cupholder_gap + wallthk;
 echo("cupholder has diameter of:", cupholder_outside*2);
 cup_travel = 10;
-cup_extension = 20;
+cup_extension = 25;
 cup_base_ht = 20;
 cup_rim_thk = 2;
 cup_ht = cup_base_ht + cup_extension + cup_travel + cup_rim_thk;
 outcup_ht = cup_ht - cup_travel - cup_extension;
 cupholder_inside_ht = outcup_ht - fudge;
 cupholder_outside_ht = cupholder_inside_ht + cup_travel + fudge;
+
+spring_rad = 4.5;
+spring_len = 26;  // compressed
 
 
 //rimjob();
