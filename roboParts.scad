@@ -1,7 +1,6 @@
 use </home/suber1/openscad/libraries/MCAD/motors.scad>;
 use </home/suber1/openscad/libraries/MCAD/involute_gears.scad>;
 use </home/suber1/openscad/libraries/cogs.scad>;
-//wtf
 panel_thickness = 7.7;
 bin_width = 63.6;
 bearing_block_thk = 19.4;
