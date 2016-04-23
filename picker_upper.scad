@@ -1,7 +1,7 @@
 incup = 53/2;
 wallthk = 1.6;
 cupside = incup + wallthk;
-fudge = 0.7;
+fudge = 0.5;
 airgap_outside = cupside + wallthk + fudge*2;
 outcup = airgap_outside + wallthk;
 
@@ -21,10 +21,11 @@ cupholder_outside_ht = cupholder_inside_ht + cup_travel + fudge;
 
 
 //rimjob();
-cup();
+scale([1, (incup*2 + 22)/(incup*2), 1]){
+    cup();
 translate([cupholder_outside*2, 0, 0])
     cupholder();
-
+}
 module rimjob(ht=1, inner=1, outer=2){
     difference(){
         cylinder(r=outer, h=ht, $fn=384);
