@@ -19,15 +19,18 @@ outcup_ht = cup_ht - cup_travel - cup_extension;
 cupholder_inside_ht = outcup_ht - fudge;
 cupholder_outside_ht = cupholder_inside_ht + cup_travel + fudge;
 
-spring_rad = 4.5;
-spring_len = 26;  // compressed
+spring_rad = 4.1;
+spring_len = 30;  // compressed
 
+cupholder_template();
 
-//rimjob();
+module twogirls(){
 scale([1, (incup*2 + 22)/(incup*2), 1]){
     cup();
 translate([cupholder_outside*2, 0, 0])
     cupholder();
+}
+
 }
 module rimjob(ht=1, inner=1, outer=2){
     difference(){
@@ -54,4 +57,34 @@ module cupholder(){
     // outer ring
     rimjob(ht=cupholder_outside_ht, inner=cupholder_gap, outer=cupholder_outside);
 }
-    
+   
+
+module cupholder_template(){
+    sfact = (incup*2 + 22)/(incup*2);
+    center_to_rim = sfact * (airgap_outside - 0.9);
+    difference(){
+        union(){
+            scale([1, sfact, 1]){
+                echo("scale factor is:", sfact, "mm to center rim:", center_to_rim);
+                rimjob(ht=cup_rim_thk, inner=incup, outer=cupholder_outside+wallthk);
+                #rimjob(ht=cup_rim_thk+.1, inner=cupholder_gap, outer=cupholder_outside);
+                }
+             for (i=[1,-1]){
+                translate([0,i*center_to_rim,0])
+                    scale([1.5, 1, 1])
+                        cylinder(r=spring_rad + 1, h=spring_len+1.7, $fn=64);
+             }
+         }
+         for (i=[1,-1]){
+             // spring holes
+            translate([0,i*(center_to_rim),-0.1])
+                    cylinder(r=spring_rad, h=spring_len+0.1, $fn=64);
+             // door hinge holes
+            translate([5*i,-50, 8])
+                rotate([-90,0,0])
+                    #cylinder(r=0.9, h=100, $fn=6);
+         }
+
+    }
+}
+
