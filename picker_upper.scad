@@ -1,7 +1,7 @@
 incup = 53/2;
 wallthk = 1.6;
 cupside = incup + wallthk;
-fudge = 0.5;
+fudge = 0.55; //0.7 on first try
 airgap_outside = cupside + wallthk + fudge*2;
 outcup = airgap_outside + wallthk;
 
