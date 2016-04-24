@@ -19,10 +19,13 @@ outcup_ht = cup_ht - cup_travel - cup_extension;
 cupholder_inside_ht = outcup_ht - fudge;
 cupholder_outside_ht = cupholder_inside_ht + cup_travel + fudge;
 
-spring_rad = 4.1;
+spring_rad = 4.5;
 spring_len = 30;  // compressed
 
-cupholder_template();
+//cupholder_template();
+//fan_cut();
+//generic_side();
+sucker_side();
 
 module twogirls(){
 scale([1, (incup*2 + 22)/(incup*2), 1]){
@@ -80,11 +83,71 @@ module cupholder_template(){
             translate([0,i*(center_to_rim),-0.1])
                     cylinder(r=spring_rad, h=spring_len+0.1, $fn=64);
              // door hinge holes
-            translate([5*i,-50, 8])
+            translate([5.5*i,-50, 8])
                 rotate([-90,0,0])
                     #cylinder(r=0.9, h=100, $fn=6);
          }
 
     }
 }
+
+
+module fan_cut(){
+    corner_rad = 7.5;
+    total_len = 120.33;
+    straight = total_len - corner_rad*2;
+    thk = 4.3;
+    center_chunk = 23;
+    fanrad = 60.35;
+    innerfan = 117.4/2;
+    inner_plate_width = cupholder_outside_ht*2+wallthk*2;
+    alum_side = total_len;
+    alum_thk = 2.4;
+    translate([0,-thk*2,corner_rad/2+wallthk]) rotate([90,0,0]){
+        cube([straight, corner_rad, thk], center=true);
+        for (i=[1,-1]){
+            translate([straight/2*i, corner_rad/2, 0])
+                cylinder(r=corner_rad, h=thk, center=true, $fn=36);
+        }
+        for (i=[0,1]){
+        mirror([i,0,0])
+            translate([straight/2, corner_rad/2, -thk*2]) rotate([0,0,-45])
+                cube([14,corner_rad, inner_plate_width + thk*5]);
+        }
+        translate([0,-corner_rad/4,-thk])
+            cube([center_chunk, corner_rad/2, thk*2], center=true);
+       translate([0, fanrad - corner_rad/2, -thk]){
+           cylinder(r=fanrad, h=thk*2, center=true, $fn=128);
+           cylinder(r=innerfan, h=inner_plate_width + thk*1.5, center=false, $fn=128);
+           translate([-alum_side/2,-alum_side/2,inner_plate_width + thk*2.65])
+                cube([alum_side, alum_side, alum_thk]);
+       }
+
+   }
+}
+
+module generic_side(total_len=120.33, wdth=87, thk=4.3){
+    difference(){
+        translate([-total_len/2, -wdth, 0]){
+            cube([total_len, wdth, thk]);
+        }
+        fan_cut();
+    }
+}
+
+module sucker_side(thk=4.3, cntr=46){
+    sfact = (incup*2 + 22)/(incup*2);
+    difference(){
+        generic_side();
+        translate([0,-cntr, thk - cup_rim_thk]){
+            scale([sfact, 1, 1]){
+                cylinder(r=cupholder_outside+wallthk, h=cup_rim_thk+0.1, $fn=256);
+            }
+        }
+        translate([0,-cntr,-0.1]) scale([sfact, 1, 1])
+            cylinder(r=cupholder_outside, h=thk, $fn=256);
+    }
+}
+            
+        
 
