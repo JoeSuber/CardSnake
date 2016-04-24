@@ -22,10 +22,11 @@ cupholder_outside_ht = cupholder_inside_ht + cup_travel + fudge;
 spring_rad = 4.5;
 spring_len = 30;  // compressed
 
-//cupholder_template();
+//springholder();
 //fan_cut();
 //generic_side();
-sucker_side();
+//sucker_side();
+flap();
 
 module twogirls(){
 scale([1, (incup*2 + 22)/(incup*2), 1]){
@@ -62,7 +63,7 @@ module cupholder(){
 }
    
 
-module cupholder_template(){
+module springholder(){
     sfact = (incup*2 + 22)/(incup*2);
     center_to_rim = sfact * (airgap_outside - 0.9);
     difference(){
@@ -148,6 +149,30 @@ module sucker_side(thk=4.3, cntr=46){
             cylinder(r=cupholder_outside, h=thk, $fn=256);
     }
 }
+
+module post(hole_ht=8, hole_size=1){
+    difference(){
+        linear_extrude(scale=.5, height=hole_ht+5){
+            square([5,10], center=true);
+        }
+    translate([0,0,hole_ht]) rotate([0,90,0])
+        cylinder(r=hole_size/2, h=10, $fn=6, center=true);
+    }
+}
+        
+module flap(offset=5, ht=8, size=(3/32)*25.4){
+    sfact = (incup*2 + 22)/(incup*2);
+    scale([sfact, 1, 1])
+        cylinder(r=incup, h=cup_rim_thk, $fn=256);
+    for (i=[-1,1]){
+        translate([incup*0.5 * i, offset, cup_rim_thk])
+            post(hole_ht=8, hole_size=size);
+        translate([incup*0.25 * i, -offset, cup_rim_thk])
+            post(hole_ht=8, hole_size=size);
+    }
+}
+    
+    
             
         
 
