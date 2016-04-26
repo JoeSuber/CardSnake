@@ -26,8 +26,8 @@ spring_len = 30;  // compressed
 //fan_cut();
 //generic_side();
 //sucker_side();
-flap();
-
+//flap();
+wire_side();
 module twogirls(){
 scale([1, (incup*2 + 22)/(incup*2), 1]){
     cup();
@@ -150,6 +150,22 @@ module sucker_side(thk=4.3, cntr=46){
     }
 }
 
+module wire_side(){
+    difference(){
+        generic_side();
+        translate([50,-50,-0.1])
+            #rj45();
+    }
+}
+
+module rj45(){
+    rotate([0,0,90]){
+    cube([20.6,17,2.9]);
+    translate([0,13.8,0]) 
+        cube([20.6,3.2,10]);
+    }
+}
+
 module post(hole_ht=8, hole_size=1){
     difference(){
         linear_extrude(scale=.5, height=hole_ht+5){
@@ -165,7 +181,7 @@ module flap(offset=5, ht=8, size=(3/32)*25.4){
     scale([sfact, 1, 1])
         cylinder(r=incup, h=cup_rim_thk, $fn=256);
     for (i=[-1,1]){
-        translate([incup*0.5 * i, offset, cup_rim_thk])
+        translate([incup*0.5 * i, offset, 0])
             post(hole_ht=8, hole_size=size);
         translate([incup*0.25 * i, -offset, cup_rim_thk])
             post(hole_ht=8, hole_size=size);
