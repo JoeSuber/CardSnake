@@ -371,14 +371,26 @@ def main():
     populate_links(card_counts(__db_card_count__.keys()[0]))
 
     trying = 7
+    repeat_tries = 10
     remains = len(it)
+    old_remain, old_remain_count = 0, 0
+    print("{} starting line items".format(remains))
+
     baddies = []
     #
     print("attempting {} per download run:".format(trying))
 
     while (remains - len(baddies)) > 0:
-        print("{:7} remain".format(remains - len(baddies)))
+        print("{:7} remain,   {:7} baddies".format(remains, len(baddies)))
         baddies, remains = download_pics(attempt=trying, skip=baddies, remaining=remains)
+        if remains == old_remain:
+            old_remain_count += 1
+        else:
+            old_remain_count = 0
+        if old_remain_count > repeat_tries:
+            print(" Definition of Insanity. Not making progress. Breaking out!")
+            break
+        old_remain = remains
 
     print("\n There are {} 'bad' items in the database: \n".format(len(baddies)))
     print(" #  setcode:    card name:             local path:             web link:\n")

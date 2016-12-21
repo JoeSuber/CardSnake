@@ -115,9 +115,10 @@ def prices(url):
     """
     try:
         return json.loads(requests.get(url).content.split('$scope.setList =  ')[1].split(';')[0])
-    except IndexError:
+    except ValueError as e:
         # rarely the page data is missing even when requests returns something saying its okay
-        print("PROBLEM WITH DATA AT: {}".format(url))
+        print("PROBLEM WITH DATA AT: {}  \n  {}".format(url, e))
+        print("{}".format(requests.get(url).content.split('$scope.setList =  ')[1].split(';')[0]))
         return []
 
 
