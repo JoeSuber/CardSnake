@@ -24,7 +24,7 @@ spring_len = 30;  // compressed
 
 //springholder();
 //fan_cut();
-//generic_side();
+generic_side();
 //sucker_side();
 //flap();
 wire_side();
@@ -85,7 +85,7 @@ module springholder(){
                     cylinder(r=spring_rad, h=spring_len+0.1, $fn=64);
              // door hinge holes
             translate([5.5*i,-50, 8])
-                rotate([-90,0,0])
+                rotate([-90,90,0])
                     #cylinder(r=0.9, h=100, $fn=6);
          }
 
