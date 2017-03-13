@@ -118,10 +118,6 @@ def prices(url):
     except:
         # rarely the page data is missing even when requests returns something saying its okay
         print("PROBLEM WITH DATA AT: {}  \n".format(url))
-        try:
-            return json.loads(requests.get(url).content.split('$scope.setList =  ')[1].split(";\n")[0] + '\"}]')
-        except IndexError:
-            print("could not hack Index problem...")
         return []
 
 
