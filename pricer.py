@@ -71,6 +71,7 @@ def async_prices(sites):
     def handler(quest_obj, exception):
         bad_objs.append(quest_obj)
         bad_explanations.append(exception)
+        print("{} has {}".format(quest_obj, exception))
 
     print("timer start: {}".format(time.time()))
 
