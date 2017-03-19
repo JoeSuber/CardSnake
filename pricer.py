@@ -12,6 +12,7 @@ get the price info for all cards from mtgprice.com and cache it into local datab
 
 import picfinder as pf
 import requests
+import grequests
 from operator import itemgetter
 import json
 import time
@@ -61,6 +62,23 @@ def mtgdate_map(url='http://www.mtgprice.com/magic-the-gathering-prices.jsp'):
         mp[mtg_seturl(kk)] = (name, FOIL, y + '-' + m + '-' + d)
     print("mtgdate_map() reports there are {} price-page-links at {}".format(len(mp), url))
     return mp
+
+
+def async_prices(sites):
+    """ sites is the dict output of mtgdate_map()  """
+    bad_objs, bad_explanations = [], []
+
+    def handler(quest_obj, exception):
+        bad_objs.append(quest_obj)
+        bad_explanations.append(exception)
+
+    print("timer start: {}".format(time.time()))
+
+    rs = (grequests.get(u) for u in sites.viewkeys())
+
+    pricelist = grequests.get(rs, exeption_handler=handler)
+
+    return pricelist, bad_objs, bad_explanations
 
 
 def localsets(db=pf.peep.set_db, sql="SELECT code, name, mkm_name, releaseDate FROM set_infos"):
