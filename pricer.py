@@ -74,9 +74,9 @@ def async_prices(sites):
 
     print("timer start: {}".format(time.time()))
 
-    rs = (grequests.get(u) for u in sites.viewkeys())
+    rs = (grequests.get(u) for u in sites.keys())
 
-    pricelist = grequests.get(rs, exeption_handler=handler)
+    pricelist = grequests.map(rs, exeption_handler=handler)
 
     return pricelist, bad_objs, bad_explanations
 
